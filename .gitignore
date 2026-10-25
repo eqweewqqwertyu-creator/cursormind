@@ -1,0 +1,19 @@
+# 依赖与构建产物（每人 npm install 后自己生成）
+node_modules/
+dist/
+
+# 密钥配置：每人自己的 API key，绝不提交！
+.env
+
+# 本地临时/测试产物（截图、调试脚本、日志）
+.temp/
+*.log
+hotkey.log
+
+# Word 文档构建脚本的中间产物
+_tmp_part1.docx
+assets/arch.png
+
+# 系统杂物
+Thumbs.db
+.DS_Store

@@ -1,0 +1,22 @@
+{
+  "name": "cursormind",
+  "version": "0.1.0",
+  "description": "灵标（CursorMind）—— 有意识的光标，会指路的精灵",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "dev": "electron ."
+  },
+  "author": "CursorMind contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "electron": "^35.0.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
