@@ -70,6 +70,11 @@ app.whenReady().then(() => {
     brain.newConversation();
   });
 
+  // 设置面板：精灵自检按钮
+  ipcMain.on('panel:test', () => {
+    brain.testFly();
+  });
+
   ipcMain.on('sprite:ready', () => {
     // 渲染进程就绪
   });

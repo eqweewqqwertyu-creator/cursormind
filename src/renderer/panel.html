@@ -10,96 +10,275 @@
       background: transparent;
       overflow: hidden;
       font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      user-select: none;
     }
-    .wrap {
+
+    /* ---------- 舞台：底部对齐，圆钮与面板都在这里 ---------- */
+    #stage {
+      position: fixed;
+      left: 0; right: 0; top: 0; bottom: 0;
+    }
+
+    /* ---------- Dock：两个悬浮圆钮 ---------- */
+    #dock {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+    .orb {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(249, 115, 22, 0.85);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      position: relative;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                  box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                  border-color 0.2s ease,
+                  opacity 0.3s ease;
+      will-change: transform;
+    }
+    .orb:hover {
+      transform: translateY(-4px) scale(1.06);
+      border-color: #F97316;
+      box-shadow: 0 14px 34px rgba(249, 115, 22, 0.35), 0 3px 8px rgba(0, 0, 0, 0.14);
+    }
+    .orb:active {
+      transform: translateY(-1px) scale(0.97);
+      transition-duration: 0.08s;
+    }
+    .orb svg {
+      width: 24px;
+      height: 24px;
+      stroke: #6B46C1;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke 0.2s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .orb:hover svg { stroke: #F97316; transform: scale(1.08); }
+    /* dock 在面板展开时整体淡出让位 */
+    #dock.hidden { pointer-events: none; }
+    #dock.hidden .orb { opacity: 0; transform: translateY(16px) scale(0.6); }
+
+    /* ---------- Morph 面板（搜索 / 设置 共用形态） ---------- */
+    .panel {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 56px;
+      height: 56px;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.97);
+      border: 1.5px solid #F97316;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.10);
+      overflow: hidden;
+      visibility: hidden;
+      will-change: width, height, border-radius, transform;
+    }
+    .panel.visible { visibility: visible; }
+
+    .panel-inner {
+      position: absolute;
+      inset: 0;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.26s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     }
+    .panel.landed .panel-inner { opacity: 1; transform: translateY(0); }
+
+    /* ---------- 搜索面板内容 ---------- */
     .reply {
       display: none;
-      background: #ffffff;
-      border: 1.5px solid #F97316;
-      border-radius: 16px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
       padding: 12px 16px;
-      box-sizing: border-box;
-      max-height: 180px;
+      max-height: 190px;
       overflow-y: auto;
-      font-size: 14px;
-      line-height: 1.55;
+      font-size: 13.5px;
+      line-height: 1.6;
       color: #1A1A1A;
       word-break: break-word;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     }
     .reply.show { display: block; }
-    .box {
+
+    .askrow {
       display: flex;
       align-items: center;
       gap: 10px;
-      background: #ffffff;
-      border: 1.5px solid #F97316;
-      border-radius: 16px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
-      padding: 12px 16px;
-      box-sizing: border-box;
-    }
-    .reset {
+      padding: 14px 16px;
       flex: none;
-      width: 26px;
-      height: 26px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: #9A9A9A;
-      font-size: 16px;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s, color 0.15s, transform 0.15s;
-    }
-    .reset:hover {
-      background: #FFF1E8;
-      color: #F97316;
-      transform: rotate(-120deg);
-    }
-    .reset:active {
-      transform: rotate(-180deg) scale(0.92);
     }
     .mark {
       flex: none;
-      width: 26px;
-      height: 26px;
-      border-radius: 8px;
+      width: 28px; height: 28px;
+      border-radius: 50%;
       background: #F97316;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 15px;
-      line-height: 1;
+      display: flex; align-items: center; justify-content: center;
     }
-    input {
+    .mark svg {
+      width: 15px; height: 15px;
+      stroke: #fff; fill: none; stroke-width: 2.4;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    input#q {
       flex: 1;
-      border: none;
-      outline: none;
+      border: none; outline: none;
       background: transparent;
       font-size: 16px;
       color: #1A1A1A;
       padding: 4px 0;
     }
-    input::placeholder {
-      color: #9A9A9A;
+    input#q::placeholder { color: #9A9A9A; }
+    .reset-btn {
+      flex: none;
+      width: 30px; height: 30px;
+      border: 1.5px solid #E8E8E8;
+      border-radius: 50%;
+      background: #FAFAFA;
+      color: #8C8C8C;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .reset-btn:hover {
+      border-color: #F97316;
+      color: #F97316;
+      background: #FFF7ED;
+      transform: rotate(-120deg);
+    }
+
+    /* ---------- 设置面板内容 ---------- */
+    .settings {
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    .settings h3 {
+      margin: 0 0 2px;
+      font-size: 14px;
+      color: #1A1A1A;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .settings h3 .tag {
+      font-size: 10px;
+      font-weight: normal;
+      color: #F97316;
+      border: 1px solid rgba(249, 115, 22, 0.4);
+      padding: 1px 7px;
+      border-radius: 999px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12.5px;
+      color: #444;
+      gap: 10px;
+    }
+    .row .k { color: #8C8C8C; }
+    .row .v { display: flex; align-items: center; gap: 6px; }
+    .pill {
+      font-size: 11px;
+      padding: 2px 9px;
+      border-radius: 999px;
+    }
+    .pill.ok { background: #ECFDF3; color: #067647; border: 1px solid #A6F4C5; }
+    .pill.no { background: #FEF3F2; color: #B42318; border: 1px solid #FECDCA; }
+    .kbd {
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      background: #F4F4F5;
+      border: 1px solid #E4E4E7;
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: #3F3F46;
+    }
+    .settings .actions { display: flex; gap: 8px; margin-top: 2px; }
+    .btn {
+      flex: 1;
+      border: 1.5px solid #E8E8E8;
+      background: #FAFAFA;
+      border-radius: 10px;
+      padding: 7px 0;
+      font-size: 12.5px;
+      color: #444;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .btn:hover { border-color: #F97316; color: #F97316; background: #FFF7ED; }
+    .btn.primary { border-color: #F97316; color: #F97316; background: #FFF7ED; }
+    .btn.primary:hover { background: #F97316; color: #fff; }
+    .settings footer {
+      font-size: 10.5px;
+      color: #B0B0B0;
+      text-align: center;
+      margin-top: 2px;
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="reply" id="reply"></div>
-    <div class="box">
-      <div class="mark">◎</div>
-      <input id="q" placeholder="问一句，比如「怎么看 issues」" autocomplete="off" spellcheck="false" />
-      <button id="reset" class="reset" title="新建对话（清空上下文）">↺</button>
+  <div id="stage">
+    <!-- Dock：两个圆钮 -->
+    <div id="dock" class="hit">
+      <button id="btnSearch" class="orb hit" title="提问（点击展开）">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+      </button>
+      <button id="btnSettings" class="orb hit" title="设置">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.09a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+      </button>
+    </div>
+
+    <!-- 搜索面板（morph 长出） -->
+    <div id="searchPanel" class="panel">
+      <div class="panel-inner">
+        <div class="reply" id="reply"></div>
+        <div class="askrow hit">
+          <div class="mark">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+          </div>
+          <input id="q" placeholder="问一句，比如「微信设置在哪」" autocomplete="off" spellcheck="false" />
+          <div class="reset-btn" id="reset" title="重置对话（Ctrl+R）">↻</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置面板（morph 长出） -->
+    <div id="settingsPanel" class="panel">
+      <div class="panel-inner">
+        <div class="settings hit">
+          <h3>灵标设置 <span class="tag">CursorMind</span></h3>
+          <div class="row"><span class="k">大脑 · 意图理解</span><span class="v" id="metaBrain"><span class="pill no">未配置</span></span></div>
+          <div class="row"><span class="k">眼睛 · 视觉定位</span><span class="v" id="metaEye"><span class="pill no">未配置</span></span></div>
+          <div class="row"><span class="k">召唤 / 引导继续</span><span class="v"><span class="kbd">Ctrl+Alt+E</span><span class="kbd">Ctrl+Alt+N</span></span></div>
+          <div class="row"><span class="k">退场 / 重置对话</span><span class="v"><span class="kbd">Esc</span><span class="kbd">Ctrl+R</span></span></div>
+          <div class="actions">
+            <button class="btn primary hit" id="btnResetConv">重置对话</button>
+            <button class="btn hit" id="btnTestFly">精灵自检</button>
+          </div>
+          <footer>v0.1.0 · 纯视觉双模型</footer>
+        </div>
+      </div>
     </div>
   </div>
   <script src="./panel.js"></script>

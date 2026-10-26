@@ -1,5 +1,5 @@
 import { sendCommand } from './overlay';
-import { showPanel, hidePanel } from './panel';
+import { showPanel, hidePanel, collapsePanel } from './panel';
 import { Agent } from './agent';
 import { VlmLocator } from './vlm-locator';
 import { captureScreen } from './screenshot';
@@ -27,9 +27,9 @@ export class Brain {
     showPanel();
   }
 
-  /** 用户提交问题：延续对话历史（Clicky 思路：会话记忆），只取消进行中的旧轮次 */
+  /** 用户提交问题：morph 收回 dock（回复到达时自动展开），对话历史延续 */
   async ask(question: string): Promise<void> {
-    hidePanel();
+    collapsePanel(); // 流体收起，不隐藏窗口（dock 仍在）
 
     if (this.agent.enabled) {
       await this.agent.run(question);
