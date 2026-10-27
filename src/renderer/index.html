@@ -9,14 +9,141 @@
       padding: 0;
       overflow: hidden;
       background: transparent;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
     }
     #stage {
+      position: fixed;
+      left: 0;
+      top: 0;
       display: block;
+      pointer-events: none;
+      z-index: 3; /* 描边/气泡在球（z-index 2）之上 */
     }
+
+    /* ================= 悬浮智能球（DOM，纯白玻璃体系） =================
+       定位：left/top=0 + margin 让元素中心对齐 (0,0)，transform 由 JS 每帧写。
+       三形态：ball（跟随圆球）/ capsule（语音胶囊）/ rect（指路透镜，JS 设尺寸）。 */
+    #orb {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: calc(var(--orb-d, 44px));
+      height: calc(var(--orb-d, 44px));
+      margin-left: calc(var(--orb-d, 44px) / -2);
+      margin-top: calc(var(--orb-d, 44px) / -2);
+      border-radius: 50%;
+      /* 纯白玻璃体：白到白的微妙渐变 + 蓝调冷高光 */
+      background:
+        radial-gradient(circle at 32% 26%, #FFFFFF 0%, rgba(255, 255, 255, 0.97) 34%, rgba(245, 249, 255, 0.93) 62%, rgba(228, 238, 252, 0.88) 100%);
+      backdrop-filter: blur(10px) saturate(1.15);
+      -webkit-backdrop-filter: blur(10px) saturate(1.15);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow:
+        0 0 18px rgba(160, 190, 235, 0.45),
+        0 6px 16px rgba(40, 60, 100, 0.18),
+        inset 0 2px 6px rgba(255, 255, 255, 0.9),
+        inset 0 -8px 14px rgba(200, 218, 245, 0.35);
+      filter: url(#glass-distortion);
+      overflow: hidden;
+      transition:
+        width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+        border-radius 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform, width, height;
+      pointer-events: none;
+      z-index: 2;
+    }
+    #orb::after {
+      /* 顶部月牙高光（纯白体系的主高光） */
+      content: '';
+      position: absolute;
+      left: 14%;
+      top: 6%;
+      width: 46%;
+      height: 34%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 72%);
+      pointer-events: none;
+    }
+    /* 胶囊态（语音）：高光改为左侧竖条 */
+    #orb.capsule::after {
+      left: 5%;
+      top: 18%;
+      width: 14%;
+      height: 64%;
+      border-radius: 50%;
+    }
+    /* 指路透镜态：中心全透 + 边缘白折射环 —— 关键：磨砂只留在边缘，中心不挡教学内容 */
+    #orb.rect {
+      background:
+        radial-gradient(circle,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0) 55%,
+          rgba(255, 255, 255, 0.55) 82%,
+          rgba(255, 255, 255, 0.9) 100%);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      filter: url(#lens-distortion);
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.4),
+        0 0 24px rgba(255, 255, 255, 0.35),
+        0 4px 14px rgba(40, 60, 100, 0.16);
+    }
+    #orb.rect::after {
+      display: none; /* 透镜态不要内部高光 */
+    }
+    #wave {
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    /* 胶囊态：声波只占上半，下半是识别文本 */
+    #orb.capsule #wave {
+      height: 55%;
+      margin-top: 3px;
+    }
+    #stt {
+      display: none;
+      position: absolute;
+      left: 26px;
+      right: 26px;
+      bottom: 0;
+      height: 38%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-size: 13px;
+      line-height: 1.2;
+      color: #3F3F46;
+      text-align: center;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      pointer-events: none;
+    }
+    #orb.capsule #stt { display: block; }
   </style>
 </head>
 <body>
+  <!-- 玻璃折射 SVG 滤镜（隐藏） -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <!-- 球/胶囊：整体轻微液态扭曲 -->
+    <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="3" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+    <!-- 指路透镜：边缘强折射环（径向湍流：低频 → 边缘位移大） -->
+    <filter id="lens-distortion" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="turbulence" baseFrequency="0.9 0.9" numOctaves="1" seed="7" result="edge-noise" />
+      <feDisplacementMap in="SourceGraphic" in2="edge-noise" scale="8" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
+  <!-- 悬浮球（内部 canvas 画声波 + 语音识别文本） -->
+  <div id="orb"><canvas id="wave"></canvas><div id="stt"></div></div>
+  <!-- 指路层：高亮圈 / 气泡 / 思考三点 -->
   <canvas id="stage"></canvas>
+
   <script src="./renderer.js"></script>
 </body>
 </html>

@@ -214,6 +214,123 @@
       color: #3F3F46;
     }
     .settings .actions { display: flex; gap: 8px; margin-top: 2px; }
+
+    /* ---------- 行内麦克风按钮 ---------- */
+    .mic-btn {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 1.5px solid #E8E8E8;
+      background: #FAFAFA;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mic-btn svg {
+      width: 16px; height: 16px;
+      stroke: #8C8C8C; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .mic-btn:hover { border-color: #F97316; background: #FFF7ED; }
+    .mic-btn:hover svg { stroke: #F97316; }
+    .mic-btn.rec {
+      border-color: #F97316;
+      background: #F97316;
+      animation: micPulse 1.2s ease-in-out infinite;
+    }
+    .mic-btn.rec svg { stroke: #fff; }
+    @keyframes micPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0.35); }
+      50% { box-shadow: 0 0 0 7px rgba(249,115,22,0); }
+    }
+    /* 录音时输入框提示 */
+    #q.listening { border-color: #F97316 !important; background: #FFF7ED; }
+
+    /* ---------- 语音开关（iOS 风格） ---------- */
+    .switch { position: relative; width: 34px; height: 20px; display: inline-block; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; inset: 0;
+      background: #D4D4D8;
+      border-radius: 999px;
+      transition: background 0.2s ease;
+      cursor: pointer;
+    }
+    .switch .slider::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 2px; top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    .switch input:checked + .slider { background: #F97316; }
+    .switch input:checked + .slider::before { transform: translateX(14px); }
+
+    /* ---------- 文字优化卡片 ---------- */
+    #textcard {
+      position: absolute;
+      bottom: 130px;
+      left: 50%;
+      transform: translateX(-50%) translateY(14px);
+      width: 480px;
+      background: rgba(255, 255, 255, 0.97);
+      border: 1.5px solid rgba(255, 255, 255, 0.9);
+      border-radius: 16px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.1);
+      padding: 14px 16px;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 5;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #textcard.show { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
+    #textcard .tc-title {
+      font-size: 12px;
+      color: #8C8C8C;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #textcard .tc-title::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #F97316;
+    }
+    #textcard .tc-block {
+      font-size: 13px;
+      line-height: 1.55;
+      padding: 8px 10px;
+      border-radius: 8px;
+      max-height: 84px;
+      overflow-y: auto;
+      word-break: break-word;
+    }
+    #textcard .tc-orig { background: #F4F4F5; color: #8C8C8C; }
+    #textcard .tc-new { background: #FFF7ED; color: #1A1A1A; border: 1px solid rgba(249, 115, 22, 0.25); }
+    #textcard .tc-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #textcard .tc-btn {
+      border: 1.5px solid #E8E8E8;
+      background: #FAFAFA;
+      border-radius: 9px;
+      padding: 6px 16px;
+      font-size: 12.5px;
+      color: #444;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    #textcard .tc-btn:hover { border-color: #F97316; color: #F97316; background: #FFF7ED; }
+    #textcard .tc-btn.primary { border-color: #F97316; color: #fff; background: #F97316; }
+    #textcard .tc-btn.primary:hover { background: #EA580C; }
     .btn {
       flex: 1;
       border: 1.5px solid #E8E8E8;
@@ -244,6 +361,9 @@
       <button id="btnSearch" class="orb hit" title="提问（点击展开）">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
       </button>
+      <button id="btnMic" class="orb hit" title="语音提问（按住说话）">
+        <svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="17.5" x2="12" y2="21"/></svg>
+      </button>
       <button id="btnSettings" class="orb hit" title="设置">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.09a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
       </button>
@@ -258,6 +378,7 @@
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
           </div>
           <input id="q" placeholder="问一句，比如「微信设置在哪」" autocomplete="off" spellcheck="false" />
+          <div class="mic-btn hit" id="micInline" title="按住说话"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="17.5" x2="12" y2="21"/></svg></div>
           <div class="reset-btn" id="reset" title="重置对话（Ctrl+R）">↻</div>
         </div>
       </div>
@@ -270,7 +391,11 @@
           <h3>灵标设置 <span class="tag">CursorMind</span></h3>
           <div class="row"><span class="k">大脑 · 意图理解</span><span class="v" id="metaBrain"><span class="pill no">未配置</span></span></div>
           <div class="row"><span class="k">眼睛 · 视觉定位</span><span class="v" id="metaEye"><span class="pill no">未配置</span></span></div>
+          <div class="row"><span class="k">嘴 · 语音播报</span><span class="v"><label class="switch hit"><input type="checkbox" id="chkVoice" checked /><span class="slider"></span></label></span></div>
+          <div class="row"><span class="k">划选优化 · 自动替换</span><span class="v"><label class="switch hit"><input type="checkbox" id="chkAutoReplace" /><span class="slider"></span></label></span></div>
           <div class="row"><span class="k">召唤 / 引导继续</span><span class="v"><span class="kbd">Ctrl+Alt+E</span><span class="kbd">Ctrl+Alt+N</span></span></div>
+          <div class="row"><span class="k">语音 / 打字</span><span class="v"><span class="kbd">~ 短按</span><span class="kbd">~ 长按</span></span></div>
+          <div class="row"><span class="k">划选优化 / 剪切</span><span class="v"><span class="kbd">Ctrl+Alt+O</span><span class="kbd">Ctrl+Alt+X</span><span class="kbd">Ctrl+Alt+V</span></span></div>
           <div class="row"><span class="k">退场 / 重置对话</span><span class="v"><span class="kbd">Esc</span><span class="kbd">Ctrl+R</span></span></div>
           <div class="actions">
             <button class="btn primary hit" id="btnResetConv">重置对话</button>
@@ -279,6 +404,17 @@
           <footer>v0.1.0 · 纯视觉双模型</footer>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 文字优化卡片（划选优化结果展示） -->
+  <div id="textcard" class="hit">
+    <div class="tc-title" id="tcTitle">优化结果</div>
+    <div class="tc-block tc-orig" id="tcOrig" style="display:none"></div>
+    <div class="tc-block tc-new" id="tcNew"></div>
+    <div class="tc-actions">
+      <button class="tc-btn hit" id="tcCancel">取消</button>
+      <button class="tc-btn primary hit" id="tcReplace">替换</button>
     </div>
   </div>
   <script src="./panel.js"></script>

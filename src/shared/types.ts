@@ -48,7 +48,13 @@ export type SpriteCommand =
   | { type: 'bubble'; text: string }
   | { type: 'clear' }
   | { type: 'flyOut' }
-  | { type: 'idle' };
+  | { type: 'idle' }
+  // 液态玻璃环境帧：低分辨率屏幕快照，渲染层用于折射采样（球迁 DOM 后已弃用，保留兼容）
+  | { type: 'envFrame'; dataUrl: string; w: number; h: number }
+  // 语音胶囊态切换（~ 键短按；长按为打字，走 invokeTyping）
+  | { type: 'toggleVoice' }
+  // 语音识别结果（百炼 qwen3-asr-flash，主进程回推）
+  | { type: 'asrResult'; text: string };
 
 // 用户动作（适配器 → 主进程）
 export interface UserAction {

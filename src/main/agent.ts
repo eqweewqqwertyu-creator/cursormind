@@ -1,15 +1,17 @@
 import type { Rect } from '../shared/types';
 import { sendCommand } from './overlay';
 import { showReply } from './panel';
+import { speak } from './tts';
 import { captureScreen } from './screenshot';
 import { parsePointing } from './point-protocol';
 import type { VlmLocator } from './vlm-locator';
 
-/** 长回答：显示在提问面板上方的回复条（不截断）；气泡只放一句短摘要 */
+/** 长回答：显示在提问面板上方的回复条（不截断）；气泡只放一句短摘要；语音朗读全文 */
 function finalAnswer(text: string): void {
   const t = (text || '').trim();
   if (!t) return;
   showReply(t);
+  speak(t);
   sendCommand({ type: 'bubble', text: truncate(t, 30) });
 }
 

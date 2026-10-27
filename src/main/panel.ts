@@ -2,6 +2,8 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 
 let panel: BrowserWindow | null = null;
+/** 退场中标志：cancel 后到达的迟到回复不再拉回窗口（白条 bug 根治） */
+let dismissed = false;
 
 const PANEL_W = 620;
 const PANEL_H = 430;
@@ -44,6 +46,7 @@ export function createPanel(): BrowserWindow {
   panel.setAlwaysOnTop(true, 'screen-saver');
   // 默认整体穿透（dock 只占底部一小块），命中元素时渲染层会关闭穿透
   panel.setIgnoreMouseEvents(true, { forward: true });
+  // 注意：透明窗口不能用 setContentProtection/WDA —— DWM 会丢弃合成导致窗口不显示
 
   panel.loadFile(path.join(__dirname, '..', '..', 'src', 'renderer', 'panel.html'));
 
@@ -74,8 +77,16 @@ function sendMeta(): void {
   }));
 }
 
+/** 收起隐藏的竞态令牌：collapse 后 420ms 内被重新 show/回复到达则取消隐藏 */
+let collapseToken = 0;
+function cancelPendingHide(): void {
+  collapseToken++;
+}
+
 /** 显示面板（dock 形态：两个圆钮） */
 export function showPanel(): void {
+  dismissed = false;
+  cancelPendingHide();
   if (!panel) createPanel();
   if (!panel || panel.isDestroyed()) return;
   if (!panel.isVisible()) panel.show();
@@ -83,20 +94,42 @@ export function showPanel(): void {
   sendMeta();
 }
 
-/** morph 收起到 dock（不隐藏窗口）：提交问题后调用 */
+/** 长按 ~ ：召唤直达打字（显示窗口 + 直接展开提问输入框并聚焦） */
+export function openSearchPanel(): void {
+  dismissed = false;
+  cancelPendingHide();
+  if (!panel) createPanel();
+  if (!panel || panel.isDestroyed()) return;
+  if (!panel.isVisible()) panel.show();
+  panel.webContents.send('panel:search');
+  sendMeta();
+}
+
+/** morph 收起并隐藏窗口（提交问题后调用：视线回到球，面板整体退场） */
 export function collapsePanel(): void {
   if (panel && !panel.isDestroyed()) {
     panel.webContents.send('panel:collapse');
+    const token = ++collapseToken;
+    setTimeout(() => {
+      if (token !== collapseToken) return; // 期间被重新 show/回复到达 → 取消隐藏
+      // 等 morph 动画（约 0.4s）结束后再隐藏窗口，避免动画中途窗口消失的生硬感
+      if (panel && !panel.isDestroyed() && !panel.webContents.isDestroyed()) {
+        panel.hide();
+      }
+    }, 420);
   }
 }
 
 export function hidePanel(): void {
+  dismissed = true;
   if (panel && !panel.isDestroyed()) panel.hide();
 }
 
-/** 显示长回答（morph 展开为"回复条 + 输入框"） */
+/** 显示长回答：退场中（dismissed）迟到回复静默丢弃，不把窗口拉回成白条；
+ *  提问后窗口已隐藏但用户在等回复 → 拉回展开 */
 export function showReply(text: string): void {
-  if (!panel || panel.isDestroyed()) return;
+  if (!panel || panel.isDestroyed() || dismissed) return;
+  cancelPendingHide(); // 回复在 collapse 的 420ms 隐藏窗口内到达：取消隐藏，否则刚展开就被藏
   if (!panel.isVisible()) panel.show();
   panel.webContents.send('panel:reply', text);
 }

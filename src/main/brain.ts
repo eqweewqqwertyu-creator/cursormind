@@ -1,5 +1,5 @@
 import { sendCommand } from './overlay';
-import { showPanel, hidePanel, collapsePanel } from './panel';
+import { showPanel, hidePanel, collapsePanel, openSearchPanel } from './panel';
 import { Agent } from './agent';
 import { VlmLocator } from './vlm-locator';
 import { captureScreen } from './screenshot';
@@ -27,13 +27,21 @@ export class Brain {
     showPanel();
   }
 
-  /** 用户提交问题：morph 收回 dock（回复到达时自动展开），对话历史延续 */
-  async ask(question: string): Promise<void> {
-    collapsePanel(); // 流体收起，不隐藏窗口（dock 仍在）
+  /** 长按 ~ ：召唤并直接展开提问输入框（打字模式） */
+  invokeTyping(): void {
+    this.agent.reset();
+    sendCommand({ type: 'flyIn', fromEdge: 'left' });
+    openSearchPanel();
+  }
 
+  /** 用户提交问题：收回面板（窗口隐藏，回复到达时若在召唤态自动再展开） */
+  async ask(question: string): Promise<void> {
     if (this.agent.enabled) {
+      // 先收面板再跑（提问后视线回到球上，面板让位）
+      collapsePanel();
       await this.agent.run(question);
     } else {
+      collapsePanel();
       await this.answerFallback(question);
     }
   }

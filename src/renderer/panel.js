@@ -197,6 +197,112 @@
   const btnTestFly = document.getElementById('btnTestFly');
   if (btnTestFly && api.testFly) btnTestFly.addEventListener('click', () => api.testFly());
 
+  // ================= 语音：听写（Web Speech API）+ 播报（主进程 TTS） =================
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btnMic = document.getElementById('btnMic');
+  const micInline = document.getElementById('micInline');
+  let rec = null;
+  let recActive = false;
+  let finalTranscript = '';
+
+  function supported() { return !!SR; }
+
+  /** 开始听写：持续模式（可多次暂停续录），Esc/再按停止并提交 */
+  function startListen(target) {
+    if (!supported()) { q.placeholder = '此浏览器不支持语音识别'; return; }
+    if (recActive) { stopListen(target); return; }
+    rec = new SR();
+    rec.lang = 'zh-CN';
+    rec.continuous = true;
+    rec.interimResults = true;
+    finalTranscript = '';
+    recActive = true;
+    (target === 'inline' ? micInline : btnMic).classList.add('rec');
+    q.classList.add('listening');
+    q.placeholder = '在听…说完按麦克风提交';
+
+    rec.onresult = function (e) {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalTranscript += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      q.value = (finalTranscript + interim).trim();
+    };
+    rec.onerror = function (e) {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        q.placeholder = '语音识别出错：' + e.error;
+      }
+      cleanup(target);
+    };
+    rec.onend = function () {
+      // continuous 模式自动断开（静音超时）→ 若仍在录音态就重启续录
+      if (recActive && supported()) {
+        try { rec.start(); } catch (err) { cleanup(target); }
+      }
+    };
+    try { rec.start(); } catch (err) { cleanup(target); }
+  }
+
+  function stopListen(target) {
+    if (!recActive) return;
+    recActive = false;
+    const text = q.value.trim();
+    if (rec) { try { rec.stop(); } catch (err) {} }
+    cleanup(target);
+    if (text) {
+      api.submitQuestion(text);
+      q.value = '';
+      reply.classList.remove('show');
+      reply.textContent = '';
+    }
+  }
+
+  function cleanup(target) {
+    (target === 'inline' ? micInline : btnMic).classList.remove('rec');
+    q.classList.remove('listening');
+    q.placeholder = '问一句，比如「微信设置在哪」';
+  }
+
+  // dock 麦克风圆钮：点击开始/停止听写
+  if (btnMic) {
+    btnMic.addEventListener('click', () => {
+      if (mode !== 'search') openSearch(false);
+      startListen('dock');
+    });
+  }
+  // 搜索行内麦克风：点击开始/停止
+  if (micInline) {
+    micInline.addEventListener('click', () => startListen('inline'));
+  }
+
+  // 语音播报开关（设置面板）→ 主进程 TTS 开关
+  const chkVoice = document.getElementById('chkVoice');
+  if (chkVoice && api.setVoice) {
+    chkVoice.addEventListener('change', () => api.setVoice(chkVoice.checked));
+  }
+
+  // 接收主进程 TTS 音频并播放（队列：上一条播完再播下一条）
+  let audioQueue = [];
+  let audioPlaying = false;
+  const audioEl = new Audio();
+  audioEl.addEventListener('ended', playNext);
+  function playNext() {
+    if (audioQueue.length === 0) { audioPlaying = false; return; }
+    audioPlaying = true;
+    audioEl.src = audioQueue.shift();
+    audioEl.play().catch(() => { audioPlaying = false; });
+  }
+  if (api.onPanelAudio) {
+    api.onPanelAudio(function (src) {
+      if (!src) return;
+      audioQueue.push(src);
+      if (audioQueue.length > 3) audioQueue = audioQueue.slice(-3); // 只留最近 3 条
+      if (!audioPlaying) playNext();
+    });
+  }
+
   q.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
       const text = q.value.trim();
@@ -208,7 +314,12 @@
       }
       e.preventDefault();
     } else if (e.key === 'Escape') {
-      if (mode === 'search' || mode === 'settings') {
+      if (recActive) {
+        recActive = false; // Esc 只停录音不提交
+        if (rec) { try { rec.stop(); } catch (err) {} }
+        cleanup('inline');
+        cleanup('dock');
+      } else if (mode === 'search' || mode === 'settings') {
         closePanel(); // 面板态：先收回 dock
       } else {
         api.dismiss(); // dock 态：退场
@@ -231,6 +342,21 @@
     mode = 'dock';
     showDock();
   });
+
+  // 长按 ~ 直达打字：重置一切后直接展开搜索面板并聚焦输入框
+  if (api.onPanelSearch) {
+    api.onPanelSearch(function () {
+      searchMorph.stop(); settingsMorph.stop();
+      settingsPanel.classList.remove('visible', 'landed');
+      searchPanel.classList.remove('visible', 'landed');
+      reply.classList.remove('show');
+      reply.textContent = '';
+      q.value = '';
+      mode = 'dock';
+      showDock();
+      openSearch(true);
+    });
+  }
 
   api.onPanelReply(function (text) {
     const t = String(text || '');
@@ -271,9 +397,51 @@
     });
   }
 
+  // ================= 文字优化卡片 =================
+  const textcard = document.getElementById('textcard');
+  const tcTitle = document.getElementById('tcTitle');
+  const tcOrig = document.getElementById('tcOrig');
+  const tcNew = document.getElementById('tcNew');
+  const tcReplace = document.getElementById('tcReplace');
+  const tcCancel = document.getElementById('tcCancel');
+  let cardMode = false; // 卡片可见时 mode 视为扩展态（穿透判定用）
+
+  if (textcard && api.onTextCard) {
+    api.onTextCard(function (data) {
+      try {
+        const d = typeof data === 'string' ? JSON.parse(data) : data;
+        tcTitle.textContent = d.title || '优化结果';
+        if (d.original) {
+          tcOrig.style.display = 'block';
+          tcOrig.textContent = d.original;
+        } else {
+          tcOrig.style.display = 'none';
+        }
+        tcNew.textContent = d.optimized || '';
+        tcReplace.style.display = d.hasAction ? '' : 'none';
+        textcard.classList.add('show');
+        cardMode = true;
+      } catch (e) { /* 忽略坏数据 */ }
+    });
+    if (api.onTextCardHide) {
+      api.onTextCardHide(function () {
+        textcard.classList.remove('show');
+        cardMode = false;
+      });
+    }
+    if (tcReplace) tcReplace.addEventListener('click', () => api.textCardReplace());
+    if (tcCancel) tcCancel.addEventListener('click', () => api.textCardCancel());
+  }
+
+  // 划选自动替换开关（设置面板）
+  const chkAutoReplace = document.getElementById('chkAutoReplace');
+  if (chkAutoReplace && api.setAutoReplace) {
+    chkAutoReplace.addEventListener('change', () => api.setAutoReplace(chkAutoReplace.checked));
+  }
+
   // ================= 透明区域点击穿透 =================
-  // 窗口是大透明区，只有 .hit 元素（圆钮/面板）可交互；其余穿透给下层应用。
-  // setIgnoreMouseEvents(true,{forward:true}) 后渲染层仍收 mousemove，据此切换。
+  // 窗口是大透明区：dock 态只 .hit（圆钮）不穿透；面板态只面板可见区域（.panel/.hit）不穿透；
+  // 其余透明区穿透给下层应用。鼠标离开窗口无条件恢复穿透。
   let ignoring = true;
   function setIgnoring(v) {
     if (v === ignoring) return;
@@ -281,15 +449,17 @@
     if (api.setIgnore) api.setIgnore(v);
   }
   document.addEventListener('mousemove', (e) => {
-    if (mode === 'dock') {
-      const hit = e.target && e.target.closest && e.target.closest('.hit');
-      setIgnoring(!hit);
-    } else {
-      setIgnoring(false); // 面板展开时不穿透
+    const t = e.target;
+    let hit = false;
+    if (t && t.closest) {
+      hit = mode === 'dock' && !cardMode
+        ? !!t.closest('.hit')
+        : (!!t.closest('.hit') || !!t.closest('.panel') || (cardMode && !!t.closest('#textcard')));
     }
+    setIgnoring(!hit);
   }, { passive: true });
   document.addEventListener('mouseleave', () => {
-    if (mode === 'dock') setIgnoring(true);
+    setIgnoring(true);
   });
   setIgnoring(true);
 })();
