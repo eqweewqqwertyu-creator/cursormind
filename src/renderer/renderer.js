@@ -40,7 +40,8 @@
   const FOLLOW_DX = 34, FOLLOW_DY = 34;  // 跟随偏移：鼠标右下角（再偏一些避让光标）
   const SPRING_K = 140;             // 弹簧刚度（跟手度）
   const SPRING_C = 18;              // 阻尼（惯性/回弹）
-  const COLORS = { ink: '#1A1A1A', orange: '#F97316' };
+  // 纯白玻璃体系（与球/面板同源）：墨灰主文字 + 灰蓝交互色；橙仅留给改写动作（DOM 层）
+  const COLORS = { ink: '#3F3F46', mute: '#8C8C8C', glassEdge: 'rgba(124, 147, 184, 0.55)' };
 
   // ---- 弹簧物理 ----
   let px = -200, py = -200;   // 当前位置（球中心，DIP）
@@ -97,6 +98,7 @@
         case 'flyOut': flyOut(); break;
         case 'idle': setIdle(); break;
         case 'toggleVoice': toggleVoice(); break;
+        case 'dblNext': abortListening(); break; // 双击 ~ 的第二击：取消录音态，下一步由主进程 nextStep 推进
         case 'asrResult': onAsrResult(cmd.text); break;
         case 'envFrame': break; // 球迁 DOM 后折射已由 CSS 处理，环境帧弃用
       }
@@ -247,6 +249,7 @@
     if (mode === 'follow') mode = 'hold'; // 停在原地，说话时球不跟鼠标跑
     if (sttEl) sttEl.textContent = '在听…说完再按一次提交';
     await initMic();
+    if (!listening) return; // initMic 期间被双击第二击 abort：不启动录音，避免麦克风泄漏
     startRecording();
   }
 
@@ -339,7 +342,7 @@
   /** 百炼 ASR 识别结果：胶囊显示后提交 Agent 链路，随后回球 */
   function onAsrResult(text) {
     const t = String(text || '').trim();
-    if (sttEl) sttEl.textContent = t ? '提问：' + t : '没听到，再试一次';
+    if (sttEl) sttEl.textContent = t ? '收到：' + t : '没听到，再试一次';
     if (t && api && api.submitVoice) api.submitVoice(t);
     setTimeout(function () {
       setShape('ball');
@@ -520,13 +523,14 @@
     bx = Math.max(8, Math.min(stage.width - bw - 8, bx));
     by = Math.max(8, by);
     sctx.save();
-    sctx.shadowColor = 'rgba(0,0,0,0.18)';
-    sctx.shadowBlur = 10;
-    sctx.shadowOffsetY = 2;
-    sctx.fillStyle = '#FFFFFF';
-    sctx.strokeStyle = COLORS.orange;
-    sctx.lineWidth = 1.5;
-    roundRectPath(sctx, bx, by, bw, bh, 10);
+    // 玻璃气泡：半透白体 + 灰蓝细边 + 球同款蓝调柔光（无 backdrop-filter，用透明度模拟材质）
+    sctx.shadowColor = 'rgba(40, 60, 100, 0.16)';
+    sctx.shadowBlur = 12;
+    sctx.shadowOffsetY = 3;
+    sctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    sctx.strokeStyle = COLORS.glassEdge;
+    sctx.lineWidth = 1;
+    roundRectPath(sctx, bx, by, bw, bh, 11);
     sctx.fill();
     sctx.shadowColor = 'transparent';
     sctx.stroke();
@@ -551,12 +555,12 @@
     bx = Math.max(8, Math.min(stage.width - bw - 8, bx));
     by = Math.max(8, by);
     sctx.save();
-    sctx.shadowColor = 'rgba(0,0,0,0.18)';
-    sctx.shadowBlur = 10;
-    sctx.shadowOffsetY = 2;
-    sctx.fillStyle = '#FFFFFF';
-    sctx.strokeStyle = COLORS.orange;
-    sctx.lineWidth = 1.5;
+    sctx.shadowColor = 'rgba(40, 60, 100, 0.16)';
+    sctx.shadowBlur = 12;
+    sctx.shadowOffsetY = 3;
+    sctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    sctx.strokeStyle = COLORS.glassEdge;
+    sctx.lineWidth = 1;
     roundRectPath(sctx, bx, by, bw, bh, 15);
     sctx.fill();
     sctx.shadowColor = 'transparent';
@@ -568,13 +572,13 @@
       const k = Math.max(0, Math.sin(phase * Math.PI));
       sctx.beginPath();
       sctx.arc(startX + i * (dotR * 2 + 6), cy, dotR * (0.7 + 0.45 * k), 0, Math.PI * 2);
-      sctx.fillStyle = COLORS.orange;
+      sctx.fillStyle = '#7C93B8';
       sctx.globalAlpha = 0.25 + 0.75 * k;
       sctx.fill();
     }
     sctx.globalAlpha = 1;
     if (thinkText) {
-      sctx.fillStyle = '#8C8C8C';
+      sctx.fillStyle = COLORS.mute;
       sctx.textBaseline = 'middle';
       sctx.fillText(thinkText, bx + 12 + dotSpan + textPad, cy + 1);
     }

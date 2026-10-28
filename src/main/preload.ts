@@ -31,6 +31,14 @@ contextBridge.exposeInMainWorld('cursormind', {
   onPanelSearch(cb: () => void): void {
     ipcRenderer.on('panel:search', () => cb());
   },
+  /** 托盘右键菜单「设置」：展开设置面板 */
+  onPanelSettings(cb: () => void): void {
+    ipcRenderer.on('panel:settings', () => cb());
+  },
+  /** 面板收回动画完成：请求主进程隐藏窗口（dock 已删，无常驻形态） */
+  requestHide(): void {
+    ipcRenderer.send('panel:request-hide');
+  },
   onPanelReply(cb: (text: string) => void): void {
     ipcRenderer.on('panel:reply', (_e, text) => cb(text));
   },

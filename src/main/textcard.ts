@@ -17,6 +17,8 @@ export function showTextCard(
   cardShown = true;
   // 替换确认走 IPC：渲染层点按钮后回发，避免闭包序列化问题
   pendingReplace = onReplace || null;
+  // 窗口隐藏时卡片发过去也看不到：先 show（卡片是 dock 窗口内的独立 DOM 元素）
+  if (!panel.isVisible()) panel.show();
   panel.webContents.send('textcard:show', JSON.stringify({
     title,
     original,

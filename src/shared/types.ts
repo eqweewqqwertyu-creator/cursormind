@@ -53,6 +53,8 @@ export type SpriteCommand =
   | { type: 'envFrame'; dataUrl: string; w: number; h: number }
   // 语音胶囊态切换（~ 键短按；长按为打字，走 invokeTyping）
   | { type: 'toggleVoice' }
+  // ~ 键双击：取消语音态并进入「引导下一步」（等价 Ctrl+Alt+N）
+  | { type: 'dblNext' }
   // 语音识别结果（百炼 qwen3-asr-flash，主进程回推）
   | { type: 'asrResult'; text: string };
 

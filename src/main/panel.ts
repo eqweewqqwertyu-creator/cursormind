@@ -1,5 +1,7 @@
 import { BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
+import { isVoiceOn } from './tts';
+import { isAutoReplace } from './textops';
 
 let panel: BrowserWindow | null = null;
 /** 退场中标志：cancel 后到达的迟到回复不再拉回窗口（白条 bug 根治） */
@@ -9,10 +11,10 @@ const PANEL_W = 620;
 const PANEL_H = 430;
 
 /**
- * 提问/设置面板：大透明窗口，默认只显示底部两个圆钮（dock），
- * 点击圆钮后在渲染层做 fluid morph 展开成面板。
+ * 提问/设置面板：大透明窗口，平时隐藏（dock 已删，「不用时窗口不存在」），
+ * 召唤/长按 ~/托盘设置时显示，面板从底部中央小圆点 fluid morph 展开。
  * 透明区域通过 setIgnoreMouseEvents(true, {forward:true}) 穿透，
- * 渲染层 mousemove 检测命中 .hit 元素时经 IPC 关闭穿透。
+ * 渲染层 mousemove 检测命中 .hit/.panel 元素时经 IPC 关闭穿透。
  */
 export function createPanel(): BrowserWindow {
   if (panel && !panel.isDestroyed()) return panel;
@@ -57,6 +59,11 @@ export function createPanel(): BrowserWindow {
     }
   });
 
+  // 面板收回动画完成后：隐藏窗口（dock 已删，无常驻形态）
+  ipcMain.on('panel:request-hide', () => {
+    if (panel && !panel.isDestroyed()) panel.hide();
+  });
+
   panel.on('closed', () => {
     panel = null;
   });
@@ -74,6 +81,8 @@ function sendMeta(): void {
   panel.webContents.send('panel:meta', JSON.stringify({
     brain: !!process.env.DEEPSEEK_API_KEY,
     eye: !!process.env.QWEN_API_KEY,
+    voice: isVoiceOn(),            // 开关真实状态同步（修复：重开后显示旧默认值）
+    autoReplace: isAutoReplace(),
   }));
 }
 
@@ -83,7 +92,7 @@ function cancelPendingHide(): void {
   collapseToken++;
 }
 
-/** 显示面板（dock 形态：两个圆钮） */
+/** 显示面板（召唤：直接展开搜索面板；dock 形态已删除） */
 export function showPanel(): void {
   dismissed = false;
   cancelPendingHide();
@@ -102,6 +111,17 @@ export function openSearchPanel(): void {
   if (!panel || panel.isDestroyed()) return;
   if (!panel.isVisible()) panel.show();
   panel.webContents.send('panel:search');
+  sendMeta();
+}
+
+/** 托盘右键菜单「设置」：展开设置面板（语音播报/自动替换等开关） */
+export function openSettingsPanel(): void {
+  dismissed = false;
+  cancelPendingHide();
+  if (!panel) createPanel();
+  if (!panel || panel.isDestroyed()) return;
+  if (!panel.isVisible()) panel.show();
+  panel.webContents.send('panel:settings');
   sendMeta();
 }
 

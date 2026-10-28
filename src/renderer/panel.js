@@ -1,7 +1,4 @@
 (function () {
-  const dock = document.getElementById('dock');
-  const btnSearch = document.getElementById('btnSearch');
-  const btnSettings = document.getElementById('btnSettings');
   const searchPanel = document.getElementById('searchPanel');
   const settingsPanel = document.getElementById('settingsPanel');
   const q = document.getElementById('q');
@@ -90,22 +87,14 @@
     };
   }
 
-  // ================= 状态机：dock / search / settings =================
-  let mode = 'dock';
+  // ================= 状态机：hidden / search / settings =================
+  // dock 栏已删除：面板从底部中央小圆点 morph 展开，收回后窗口隐藏（「不用时窗口不存在」）
+  let mode = 'hidden';
   const searchMorph = createMorph(searchPanel);
   const settingsMorph = createMorph(settingsPanel);
-  const stage = document.getElementById('stage');
 
-  /** 圆钮中心相对舞台中心的 x 偏移（morph 起点） */
-  function orbOffsetX(orb) {
-    const sr = stage.getBoundingClientRect();
-    const r = orb.getBoundingClientRect();
-    return (r.left + r.width / 2) - (sr.left + sr.width / 2);
-  }
-
-  function collapsedGeo(orb) {
-    return { w: 56, h: 56, r: 28, x: orbOffsetX(orb) };
-  }
+  /** morph 起点几何：底部中央 56px 小圆点（dock 删除前的圆钮位置） */
+  const DOCK_GEO = { w: 56, h: 56, r: 28, x: 0 };
 
   /** 量出面板目标高度（内容自适应，隐形测量） */
   function measurePanelH(panel) {
@@ -120,17 +109,13 @@
     return Math.max(h, 92);
   }
 
-  function showDock() { dock.classList.remove('hidden'); }
-  function hideDock() { dock.classList.add('hidden'); }
-
   function openSearch(autoFocus) {
     if (mode === 'search') return;
     closeOther('search');
     mode = 'search';
-    hideDock();
     searchPanel.classList.add('visible');
     searchPanel.classList.remove('landed');
-    const from = collapsedGeo(btnSearch);
+    const from = DOCK_GEO;
     const to = { w: PANEL_W, h: measurePanelH(searchPanel), r: PANEL_R, x: 0 };
     searchMorph.go(from, to, () => {
       searchPanel.classList.add('landed');
@@ -142,10 +127,9 @@
     if (mode === 'settings') return;
     closeOther('settings');
     mode = 'settings';
-    hideDock();
     settingsPanel.classList.add('visible');
     settingsPanel.classList.remove('landed');
-    const from = collapsedGeo(btnSettings);
+    const from = DOCK_GEO;
     const to = { w: 360, h: measurePanelH(settingsPanel), r: PANEL_R, x: 0 };
     settingsMorph.go(from, to, () => {
       settingsPanel.classList.add('landed');
@@ -156,15 +140,15 @@
     const panel = mode === 'search' ? searchPanel : mode === 'settings' ? settingsPanel : null;
     if (!panel) return;
     const morph = mode === 'search' ? searchMorph : settingsMorph;
-    const orb = mode === 'search' ? btnSearch : btnSettings;
-    const cur = morph.current || collapsedGeo(orb);
+    const cur = morph.current || DOCK_GEO;
     panel.classList.remove('landed');
-    morph.go({ w: cur.w, h: cur.h, r: cur.r, x: cur.x }, collapsedGeo(orb), () => {
+    morph.go({ w: cur.w, h: cur.h, r: cur.r, x: cur.x }, DOCK_GEO, () => {
       panel.classList.remove('visible');
-      showDock();
+      // 收回后窗口直接隐藏（dock 已删，没有常驻形态）
+      if (api.requestHide) api.requestHide();
       q.blur();
     });
-    mode = 'dock';
+    mode = 'hidden';
   }
 
   function closeOther(next) {
@@ -178,8 +162,9 @@
   }
 
   // ================= 交互绑定 =================
-  btnSearch.addEventListener('click', () => openSearch());
-  btnSettings.addEventListener('click', () => openSettings());
+  // 设置面板右上角关闭钮（dock 删除后的独立关闭途径）
+  const btnCloseSettings = document.getElementById('btnCloseSettings');
+  if (btnCloseSettings) btnCloseSettings.addEventListener('click', () => closePanel());
   // 面板空白处双击收起
   searchPanel.addEventListener('dblclick', (e) => { if (e.target === searchPanel) closePanel(); });
   settingsPanel.addEventListener('dblclick', (e) => { if (e.target === settingsPanel) closePanel(); });
@@ -197,9 +182,9 @@
   const btnTestFly = document.getElementById('btnTestFly');
   if (btnTestFly && api.testFly) btnTestFly.addEventListener('click', () => api.testFly());
 
-  // ================= 语音：听写（Web Speech API）+ 播报（主进程 TTS） =================
+  // ================= 语音：听写（搜索行内麦克风）+ 播报（主进程 TTS） =================
+  // dock 麦克风已随 dock 删除；此处的 Web Speech 听写仅剩行内入口（国内网络不可用，实际语音走 ~ 键胶囊链路）
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btnMic = document.getElementById('btnMic');
   const micInline = document.getElementById('micInline');
   let rec = null;
   let recActive = false;
@@ -208,16 +193,16 @@
   function supported() { return !!SR; }
 
   /** 开始听写：持续模式（可多次暂停续录），Esc/再按停止并提交 */
-  function startListen(target) {
+  function startListen() {
     if (!supported()) { q.placeholder = '此浏览器不支持语音识别'; return; }
-    if (recActive) { stopListen(target); return; }
+    if (recActive) { stopListen(); return; }
     rec = new SR();
     rec.lang = 'zh-CN';
     rec.continuous = true;
     rec.interimResults = true;
     finalTranscript = '';
     recActive = true;
-    (target === 'inline' ? micInline : btnMic).classList.add('rec');
+    micInline.classList.add('rec');
     q.classList.add('listening');
     q.placeholder = '在听…说完按麦克风提交';
 
@@ -234,23 +219,23 @@
       if (e.error !== 'no-speech' && e.error !== 'aborted') {
         q.placeholder = '语音识别出错：' + e.error;
       }
-      cleanup(target);
+      cleanup();
     };
     rec.onend = function () {
       // continuous 模式自动断开（静音超时）→ 若仍在录音态就重启续录
       if (recActive && supported()) {
-        try { rec.start(); } catch (err) { cleanup(target); }
+        try { rec.start(); } catch (err) { cleanup(); }
       }
     };
-    try { rec.start(); } catch (err) { cleanup(target); }
+    try { rec.start(); } catch (err) { cleanup(); }
   }
 
-  function stopListen(target) {
+  function stopListen() {
     if (!recActive) return;
     recActive = false;
     const text = q.value.trim();
     if (rec) { try { rec.stop(); } catch (err) {} }
-    cleanup(target);
+    cleanup();
     if (text) {
       api.submitQuestion(text);
       q.value = '';
@@ -259,22 +244,15 @@
     }
   }
 
-  function cleanup(target) {
-    (target === 'inline' ? micInline : btnMic).classList.remove('rec');
+  function cleanup() {
+    micInline.classList.remove('rec');
     q.classList.remove('listening');
     q.placeholder = '问一句，比如「微信设置在哪」';
   }
 
-  // dock 麦克风圆钮：点击开始/停止听写
-  if (btnMic) {
-    btnMic.addEventListener('click', () => {
-      if (mode !== 'search') openSearch(false);
-      startListen('dock');
-    });
-  }
   // 搜索行内麦克风：点击开始/停止
   if (micInline) {
-    micInline.addEventListener('click', () => startListen('inline'));
+    micInline.addEventListener('click', () => startListen());
   }
 
   // 语音播报开关（设置面板）→ 主进程 TTS 开关
@@ -317,12 +295,11 @@
       if (recActive) {
         recActive = false; // Esc 只停录音不提交
         if (rec) { try { rec.stop(); } catch (err) {} }
-        cleanup('inline');
-        cleanup('dock');
+        cleanup();
       } else if (mode === 'search' || mode === 'settings') {
-        closePanel(); // 面板态：先收回 dock
+        closePanel(); // 面板态：收回并隐藏窗口
       } else {
-        api.dismiss(); // dock 态：退场
+        api.dismiss(); // 空态：退场
       }
       e.preventDefault();
     } else if (e.key.toLowerCase() === 'r' && (e.ctrlKey || e.metaKey)) {
@@ -332,6 +309,7 @@
   });
 
   // ================= 与主进程的消息 =================
+  // 召唤（Ctrl+Alt+E / 托盘左键）：dock 已删，直接展开搜索面板
   api.onPanelOpen(function () {
     searchMorph.stop(); settingsMorph.stop();
     searchPanel.classList.remove('visible', 'landed');
@@ -339,8 +317,8 @@
     reply.classList.remove('show');
     reply.textContent = '';
     q.value = '';
-    mode = 'dock';
-    showDock();
+    mode = 'hidden';
+    openSearch(true);
   });
 
   // 长按 ~ 直达打字：重置一切后直接展开搜索面板并聚焦输入框
@@ -352,9 +330,19 @@
       reply.classList.remove('show');
       reply.textContent = '';
       q.value = '';
-      mode = 'dock';
-      showDock();
+      mode = 'hidden';
       openSearch(true);
+    });
+  }
+
+  // 托盘右键菜单「设置」：展开设置面板
+  if (api.onPanelSettings) {
+    api.onPanelSettings(function () {
+      searchMorph.stop(); settingsMorph.stop();
+      searchPanel.classList.remove('visible', 'landed');
+      settingsPanel.classList.remove('visible', 'landed');
+      mode = 'hidden';
+      openSettings();
     });
   }
 
@@ -365,7 +353,7 @@
     reply.classList.add('show');
     reply.scrollTop = 0;
     if (mode !== 'search') {
-      openSearch(); // 从 dock morph 展开，显示回复
+      openSearch(false); // 隐藏态被回复拉回：morph 展开，不抢输入焦点
     } else {
       const cur = searchMorph.current || { w: PANEL_W, h: 92, r: PANEL_R, x: 0 };
       searchMorph.go(
@@ -393,6 +381,9 @@
         if (eye) eye.innerHTML = m.eye
           ? '<span class="pill ok">qwen3-vl-plus ✓</span>'
           : '<span class="pill no">未配置 Key</span>';
+        // 开关真实状态同步（主进程为源，面板只反映；修复：重开后显示旧默认值）
+        if (chkVoice && typeof m.voice === 'boolean') chkVoice.checked = m.voice;
+        if (chkAutoReplace && typeof m.autoReplace === 'boolean') chkAutoReplace.checked = m.autoReplace;
       } catch (e) { /* 忽略 */ }
     });
   }
@@ -452,9 +443,9 @@
     const t = e.target;
     let hit = false;
     if (t && t.closest) {
-      hit = mode === 'dock' && !cardMode
-        ? !!t.closest('.hit')
-        : (!!t.closest('.hit') || !!t.closest('.panel') || (cardMode && !!t.closest('#textcard')));
+      // dock 已删：面板态（search/settings）与卡片态命中 .panel/.hit/#textcard 不穿透，
+      // 其余（含隐藏态残余鼠标事件）全穿透给下层应用
+      hit = !!t.closest('.hit') || !!t.closest('.panel') || (cardMode && !!t.closest('#textcard'));
     }
     setIgnoring(!hit);
   }, { passive: true });

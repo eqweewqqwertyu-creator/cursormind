@@ -3,6 +3,7 @@ import { sendCommand } from './overlay';
 import { showReply } from './panel';
 import { speak } from './tts';
 import { captureScreen } from './screenshot';
+import { setTrayBusy } from './tray';
 import { parsePointing } from './point-protocol';
 import type { VlmLocator } from './vlm-locator';
 
@@ -113,8 +114,17 @@ export class Agent {
     await this.run('[用户已完成上一步，按了 Ctrl+Alt+N] 请看最新截图：确认上一步是否完成，然后继续指下一步，或宣布任务完成。');
   }
 
-  /** ReAct 主循环：思考 → 调工具 → 观察 → 再思考 */
+  /** ReAct 主循环：思考 → 调工具 → 观察 → 再思考（托盘同步置忙，暗示正在跑） */
   async run(question: string): Promise<void> {
+    setTrayBusy(true);
+    try {
+      await this.runLoop(question);
+    } finally {
+      setTrayBusy(false);
+    }
+  }
+
+  private async runLoop(question: string): Promise<void> {
     if (!this.enabled) {
       sendCommand({ type: 'bubble', text: '未配置 DeepSeek API Key' });
       return;
