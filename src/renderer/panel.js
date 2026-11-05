@@ -7,11 +7,124 @@
   const api = window.cursormind;
   if (!api) return;
 
+  // ================= 液态玻璃弹性交互（glass.html 方案移植） =================
+  // 鼠标在面板上移动 → 面板朝鼠标轻拉（±5px、lerp 平滑）、双色差层错位 ±1.1px 出彩色镶边、
+  // 聚光跟随、按压轻缩 0.97。弹性偏移写入 elastic；MorphEngine.apply 与本节 rAF
+  // 用同一变换公式消费，morph 动画与弹性不会互相覆盖。
+  const elastic = { x: 0, y: 0, s: 1 };
+  const elasticTarget = { x: 0, y: 0, s: 1 };
+  const GLASS_STRENGTH = 5;
+  const GLASS_SMOOTH = 0.06;
+  const GLASS_PRESS = 0.97;
+  let glassPanel = null;
+  let glassRaf = 0;
+
+  function panelMorphX(panel) {
+    const m = panel === searchPanel ? searchMorph : panel === settingsPanel ? settingsMorph : null;
+    return m && m.current ? m.current.x : 0;
+  }
+
+  function applyGlassTransform(panel) {
+    panel.style.transform =
+      'translateX(calc(-50% + ' + (panelMorphX(panel) + elastic.x).toFixed(1) + 'px)) translateY(' +
+      elastic.y.toFixed(1) + 'px) scale(' + elastic.s.toFixed(3) + ')';
+  }
+
+  function glassFrame() {
+    glassRaf = 0;
+    elastic.x += (elasticTarget.x - elastic.x) * GLASS_SMOOTH;
+    elastic.y += (elasticTarget.y - elastic.y) * GLASS_SMOOTH;
+    elastic.s += (elasticTarget.s - elastic.s) * 0.3;
+    if (glassPanel && glassPanel.classList.contains('visible')) {
+      applyGlassTransform(glassPanel);
+      const g = glassPanel._lg;
+      if (g) {
+        if (g.chromaR) g.chromaR.style.transform = 'translate(' + (elastic.x + 1.1).toFixed(2) + 'px, ' + (elastic.y + 0.4).toFixed(2) + 'px)';
+        if (g.chromaB) g.chromaB.style.transform = 'translate(' + (elastic.x - 1.1).toFixed(2) + 'px, ' + (elastic.y - 0.4).toFixed(2) + 'px)';
+      }
+    }
+    const settled =
+      Math.abs(elasticTarget.x - elastic.x) < 0.01 &&
+      Math.abs(elasticTarget.y - elastic.y) < 0.01 &&
+      Math.abs(elasticTarget.s - elastic.s) < 0.001;
+    const atRest = elasticTarget.x === 0 && elasticTarget.y === 0 && elasticTarget.s === 1;
+    if (!(settled && atRest)) glassRaf = requestAnimationFrame(glassFrame);
+  }
+
+  function startGlassLoop() {
+    if (!glassRaf) glassRaf = requestAnimationFrame(glassFrame);
+  }
+
+  function resetGlassElastic() {
+    elastic.x = 0; elastic.y = 0; elastic.s = 1;
+    elasticTarget.x = 0; elasticTarget.y = 0; elasticTarget.s = 1;
+    glassPanel = null;
+  }
+
+  function bindLiquidGlass(panel) {
+    const spot = panel.querySelector('.spot-light');
+    const chromaR = panel.querySelector('.chroma-r');
+    const chromaB = panel.querySelector('.chroma-b');
+    panel._lg = { spot, chromaR, chromaB };
+
+    panel.addEventListener('mousemove', (e) => {
+      const rect = panel.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      glassPanel = panel;
+      elasticTarget.x = ((x - cx) / cx) * GLASS_STRENGTH;
+      elasticTarget.y = ((y - cy) / cy) * GLASS_STRENGTH;
+      if (spot) { spot.style.left = x + 'px'; spot.style.top = y + 'px'; }
+      startGlassLoop();
+    });
+    panel.addEventListener('mouseleave', () => {
+      if (glassPanel !== panel) return;
+      elasticTarget.x = 0;
+      elasticTarget.y = 0;
+      startGlassLoop();
+    });
+    panel.addEventListener('mousedown', (e) => {
+      // 输入框/按钮上按压不缩（那是点击意图，不是“捏玻璃”）
+      if (e.target.closest && e.target.closest('input, button, label, .hit')) return;
+      glassPanel = panel;
+      elasticTarget.s = GLASS_PRESS;
+      startGlassLoop();
+    });
+  }
+  window.addEventListener('mouseup', () => {
+    if (elasticTarget.s !== 1) {
+      elasticTarget.s = 1;
+      startGlassLoop();
+    }
+  });
+  bindLiquidGlass(searchPanel);
+  bindLiquidGlass(settingsPanel);
+
+  // 主进程推送的桌面截屏 → 两块背景实层共用（面板位置不同但都是底部区域，够用）
+  if (api.onPanelBackdrop) {
+    api.onPanelBackdrop(function (dataUrl) {
+      if (!dataUrl) return;
+      const bgs = [document.getElementById('lgBgSearch'), document.getElementById('lgBgSettings')];
+      bgs.forEach(function (el) {
+        if (el) {
+          el.style.backgroundImage = 'url(' + dataUrl + ')';
+          el.classList.add('ready');
+        }
+      });
+    });
+  }
+
   // ================= MorphEngine：高阻尼弹簧（fluid morph） =================
   // 过阻尼弹簧积分器：快速起步 → 长尾缓慢沉降，无回弹振荡（高阻尼特征）。
   // 同一进度 t 驱动 width/height/radius/x 四个属性，幂次微差产生"流体错位感"。
-  const PANEL_W = 540; // 展开宽度
+  const PANEL_W = 540; // 搜索面板展开宽度
   const PANEL_R = 18;  // 展开圆角
+  const SETTINGS_W = 480; // 设置面板展开宽度（调大；高度内容自适应）
+  // 打字模式（Gemini 式）：横向小卡贴鼠标右下——输入行 + 预设问题排
+  const COMPACT_W = 460;
+  const COMPACT_H = 104;
 
   function createMorph(el) {
     let raf = 0;
@@ -28,8 +141,8 @@
       el.style.width = cur.w.toFixed(1) + 'px';
       el.style.height = cur.h.toFixed(1) + 'px';
       el.style.borderRadius = cur.r.toFixed(1) + 'px';
-      // x = 面板中心相对舞台中心的偏移
-      el.style.transform = 'translateX(calc(-50% + ' + cur.x.toFixed(1) + 'px))';
+      // x = 面板中心相对舞台中心的偏移；弹性跟随（glass.html）叠加在同一变换上，与 applyGlassTransform 同公式
+      el.style.transform = 'translateX(calc(-50% + ' + (cur.x + elastic.x).toFixed(1) + 'px)) translateY(' + elastic.y.toFixed(1) + 'px) scale(' + elastic.s.toFixed(3) + ')';
     }
 
     function lerp(a, b, k) { return a + (b - a) * k; }
@@ -97,10 +210,10 @@
   const DOCK_GEO = { w: 56, h: 56, r: 28, x: 0 };
 
   /** 量出面板目标高度（内容自适应，隐形测量） */
-  function measurePanelH(panel) {
+  function measurePanelH(panel, width) {
     const prev = panel.style.cssText;
     panel.style.visibility = 'hidden';
-    panel.style.width = PANEL_W + 'px';
+    panel.style.width = (width || PANEL_W) + 'px';
     panel.style.height = 'auto';
     panel.style.borderRadius = PANEL_R + 'px';
     panel.style.transform = 'translateX(-50%)';
@@ -110,13 +223,21 @@
   }
 
   function openSearch(autoFocus) {
-    if (mode === 'search') return;
+    if (mode === 'search') {
+      if (autoFocus) q.focus();
+      return;
+    }
     closeOther('search');
     mode = 'search';
     searchPanel.classList.add('visible');
     searchPanel.classList.remove('landed');
+    // 打字直达（autoFocus=true）→ Gemini 式紧凑小卡（贴鼠标右下）；回复拉回（false）→ 大卡
+    const compact = autoFocus === true;
+    searchPanel.classList.toggle('compact', compact);
     const from = DOCK_GEO;
-    const to = { w: PANEL_W, h: measurePanelH(searchPanel), r: PANEL_R, x: 0 };
+    const to = compact
+      ? { w: COMPACT_W, h: COMPACT_H, r: 22, x: 0 }
+      : { w: PANEL_W, h: measurePanelH(searchPanel), r: PANEL_R, x: 0 };
     searchMorph.go(from, to, () => {
       searchPanel.classList.add('landed');
       if (autoFocus !== false) q.focus();
@@ -129,8 +250,10 @@
     mode = 'settings';
     settingsPanel.classList.add('visible');
     settingsPanel.classList.remove('landed');
+    if (api.mcpGet) api.mcpGet(); // 打开设置时拉 MCP 配置（开关/token 回显）
     const from = DOCK_GEO;
-    const to = { w: 360, h: measurePanelH(settingsPanel), r: PANEL_R, x: 0 };
+    // 设置面板展开到至少 700 高（不只看内容，保证面板本身大气、内容完整平铺）
+    const to = { w: SETTINGS_W, h: Math.max(measurePanelH(settingsPanel, SETTINGS_W), 700), r: PANEL_R, x: 0 };
     settingsMorph.go(from, to, () => {
       settingsPanel.classList.add('landed');
     });
@@ -142,6 +265,7 @@
     const morph = mode === 'search' ? searchMorph : settingsMorph;
     const cur = morph.current || DOCK_GEO;
     panel.classList.remove('landed');
+    resetGlassElastic(); // 收回时归零弹性（面板缩小过程中不再被鼠标拉扯）
     morph.go({ w: cur.w, h: cur.h, r: cur.r, x: cur.x }, DOCK_GEO, () => {
       panel.classList.remove('visible');
       // 收回后窗口直接隐藏（dock 已删，没有常驻形态）
@@ -255,10 +379,64 @@
     micInline.addEventListener('click', () => startListen());
   }
 
+  // 发送按钮 + 预设问题胶囊（打字模式）：点击即提交
+  function askNow(text) {
+    const t = String(text || '').trim();
+    if (!t) return;
+    api.submitQuestion(t);
+    q.value = '';
+    reply.classList.remove('show');
+    reply.textContent = '';
+  }
+  const btnSend = document.getElementById('btnSend');
+  if (btnSend) btnSend.addEventListener('click', () => askNow(q.value));
+  const quickRow = document.getElementById('quickRow');
+  if (quickRow) {
+    quickRow.querySelectorAll('.quick-btn').forEach((b) => {
+      b.addEventListener('click', () => askNow(b.dataset.q));
+    });
+  }
+
   // 语音播报开关（设置面板）→ 主进程 TTS 开关
   const chkVoice = document.getElementById('chkVoice');
   if (chkVoice && api.setVoice) {
     chkVoice.addEventListener('change', () => api.setVoice(chkVoice.checked));
+  }
+
+  // 灵标球可见性开关（设置面板）→ 主进程 setOrbVisible（隐藏跟随球，功能链路保留）
+  const chkOrb = document.getElementById('chkOrb');
+  if (chkOrb && api.setOrbVisible) {
+    chkOrb.addEventListener('change', () => api.setOrbVisible(chkOrb.checked));
+  }
+
+  // MCP（飞书）开关 + token 输入（设置面板）→ 主进程持久化
+  const chkMcp = document.getElementById('chkMcp');
+  const inMcpToken = document.getElementById('inMcpToken');
+  if (api.onMcpData) {
+    api.onMcpData((cfg) => {
+      if (chkMcp) chkMcp.checked = !!(cfg && cfg.enabled);
+      if (inMcpToken) inMcpToken.value = (cfg && cfg.feishu && cfg.feishu.token) || '';
+    });
+  }
+  if (chkMcp && api.mcpSave) {
+    chkMcp.addEventListener('change', () => api.mcpSave({ enabled: chkMcp.checked }));
+  }
+  if (inMcpToken && api.mcpSave) {
+    const commitToken = () => api.mcpSave({ feishu: { token: inMcpToken.value } });
+    inMcpToken.addEventListener('change', commitToken);
+    inMcpToken.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitToken(); inMcpToken.blur(); }
+    });
+  }
+
+  // 语音热词输入（设置面板）：失焦或回车即保存
+  const inHotwords = document.getElementById('inHotwords');
+  if (inHotwords && api.setHotwords) {
+    const commitHotwords = () => api.setHotwords(inHotwords.value);
+    inHotwords.addEventListener('change', commitHotwords);
+    inHotwords.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitHotwords(); inHotwords.blur(); }
+    });
   }
 
   // 接收主进程 TTS 音频并播放（队列：上一条播完再播下一条）
@@ -352,6 +530,7 @@
     reply.textContent = t;
     reply.classList.add('show');
     reply.scrollTop = 0;
+    searchPanel.classList.remove('compact'); // 回复展示 → 大卡形态
     if (mode !== 'search') {
       openSearch(false); // 隐藏态被回复拉回：morph 展开，不抢输入焦点
     } else {
@@ -384,6 +563,9 @@
         // 开关真实状态同步（主进程为源，面板只反映；修复：重开后显示旧默认值）
         if (chkVoice && typeof m.voice === 'boolean') chkVoice.checked = m.voice;
         if (chkAutoReplace && typeof m.autoReplace === 'boolean') chkAutoReplace.checked = m.autoReplace;
+        if (chkOrb && typeof m.orbVisible === 'boolean') chkOrb.checked = m.orbVisible;
+        const hw = document.getElementById('inHotwords');
+        if (hw && typeof m.hotwords === 'string' && document.activeElement !== hw) hw.value = m.hotwords;
       } catch (e) { /* 忽略 */ }
     });
   }

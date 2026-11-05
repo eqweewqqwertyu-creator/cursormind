@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek Harness 引擎接入报告</title>
+<style>
+/* ========== Reset & Base ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { min-height: 100%; }
+body {
+  position: relative;
+  font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", "Noto Sans SC", sans-serif;
+  color: #1f2d3d;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  background: linear-gradient(160deg, #f8fafc 0%, #ffffff 45%, #cfe0f5 100%);
+  min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 45% 35% at 12% 8%, rgba(255,255,255,0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 88% 90%, rgba(255,255,255,0.45) 0%, transparent 55%);
+}
+body > * { position: relative; z-index: 1; }
+
+/* ========== 封面 Hero ========== */
+.title {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 40px;
+  text-align: center;
+  background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 50%, #4f8ef7 100%);
+  color: #ffffff;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+.title::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 82%, rgba(255,255,255,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 82% 18%, rgba(255,255,255,0.08) 0%, transparent 55%);
+  pointer-events: none;
+}
+.title > * { position: relative; z-index: 1; }
+.title h1 { font-size: 28px; font-weight: 800; margin: 0 0 14px 0; letter-spacing: 1px; color: #ffffff; }
+.title .accent-line {
+  width: 48px; height: 3px; background: rgba(255,255,255,0.85);
+  margin: 0 auto 18px; border-radius: 2px;
+}
+.title p { font-size: 15px; color: rgba(255,255,255,0.85); margin: 0; line-height: 1.7; }
+
+/* ========== 章节标题 ========== */
+h1.heading {
+  font-size: 28px;
+  color: #0f1e33;
+  margin: 36px 0 16px 0;
+  font-weight: 700;
+  border-left: 4px solid #3b82f6;
+  padding-left: 16px;
+}
+h2.heading {
+  font-size: 22px;
+  color: #0f1e33;
+  margin: 28px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #c9d6f3;
+  font-weight: 600;
+}
+
+/* ========== 正文 / 列表 ========== */
+.paragraph { font-size: 15px; color: #1f2d3d; line-height: 1.8; margin: 0 0 16px 0; text-indent: 2em; }
+.list { margin: 0 0 16px 0; padding-left: 24px; font-size: 15px; color: #1f2d3d; line-height: 1.8; }
+.list li { margin-bottom: 8px; }
+.list li::marker { color: #3b82f6; }
+
+/* ========== 正文区卡片化容器 ========== */
+.doc-section {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 24px 28px;
+  margin: 0 0 16px 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+.doc-section.alt { background: #e6edf6; box-shadow: none; }
+
+/* ========== callout ========== */
+.callout {
+  margin: 0 0 16px 0;
+  padding: 16px 24px;
+  background: #e8f0fe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+}
+.callout[data-variant="warning"] { background: #FFF3E0; border-left-color: #d97706; }
+.callout[data-variant="quote"]   { background: #f0fdfa; border-left-color: #14b8a6; }
+.callout p { font-size: 15px; color: #1f2d3d; margin: 0; line-height: 1.8; }
+
+/* ========== 表格 ========== */
+.table-wrap {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  overflow: hidden;
+  margin: 0 0 16px 0;
+}
+.table-caption {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #c9d6f3, #e8f0fe);
+  color: #0f1e33;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 1px solid #dbe4ef;
+}
+table.table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+table.table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  background: #c9d6f3;
+  color: #0f1e33;
+  font-weight: 700;
+  border-bottom: 2px solid #dbe4ef;
+  word-break: break-word;
+}
+table.table tbody td { padding: 12px 16px; border-bottom: 1px solid #dbe4ef; color: #1f2d3d; word-break: break-word; }
+table.table tbody tr:last-child td { border-bottom: none; }
+table.table tbody tr:hover { background: #e8f0fe; }
+
+/* ========== stat ========== */
+.stat-grid { display: flex; gap: 16px; margin: 0 0 16px 0; }
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border-top: 3px solid #3b82f6;
+}
+.stat .num { font-size: 28px; color: #3b82f6; font-weight: 800; line-height: 1.1; }
+.stat .label { font-size: 12px; color: #5b6b80; margin-top: 6px; }
+
+/* ========== timeline ========== */
+.timeline { list-style: none; padding: 0; margin: 0 0 16px 0; }
+.timeline li {
+  position: relative;
+  padding-left: 28px;
+  padding-bottom: 18px;
+  border-left: 2px solid #e8f0fe;
+  margin-left: 6px;
+}
+.timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: -7px; top: 5px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #f4f7fb;
+  box-shadow: 0 0 0 2px #e8f0fe;
+}
+.timeline strong { font-size: 14px; color: #3b82f6; }
+.timeline p { font-size: 15px; color: #1f2d3d; margin: 4px 0 0 0; line-height: 1.8; }
+
+/* ========== code ========== */
+.code {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 0 0 16px 0;
+  font-family: 'Cascadia Code', 'Fira Code', 'SF Mono', 'Source Code Pro', Consolas, monospace;
+}
+
+/* ========== card ========== */
+.card-grid { display: flex; gap: 16px; margin: 0 0 16px 0; }
+.card {
+  flex: 1;
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border-top: 3px solid #3b82f6;
+}
+.card h3 { font-size: 18px; color: #0f1e33; margin: 0 0 8px 0; font-weight: 700; }
+.card p  { font-size: 14px; color: #5b6b80; margin: 0; line-height: 1.7; }
+
+/* ========== divider ========== */
+.divider { margin: 32px 0; text-align: center; user-select: none; }
+.divider .line {
+  display: inline-block;
+  width: 36px;
+  height: 1px;
+  vertical-align: middle;
+  background: linear-gradient(to right, transparent, #e8f0fe);
+}
+.divider .line:last-child { background: linear-gradient(to left, transparent, #e8f0fe); }
+.divider .diamond {
+  display: inline-block;
+  width: 8px; height: 8px;
+  margin: 0 12px;
+  vertical-align: middle;
+  transform: rotate(45deg);
+  background: #3b82f6;
+  border-radius: 1px;
+  box-shadow: 0 0 0 2px #f4f7fb;
+}
+
+/* ========== 尾页 ========== */
+.end_page {
+  margin-top: 24px;
+  padding: 56px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #c9d6f3 0%, #e8f0fe 100%);
+  border-radius: 16px;
+}
+.end_page h1 { font-size: 28px; color: #0f1e33; margin: 0 0 16px 0; font-weight: 800; }
+.end_page p  { font-size: 15px; color: #5b6b80; margin: 0; line-height: 1.8; }
+
+/* ========== 响应式 ========== */
+@media screen and (max-width: 600px) {
+  body { padding: 16px !important; }
+  h1 { font-size: 22px !important; }
+  h2 { font-size: 18px !important; }
+  h3 { font-size: 16px !important; }
+  .stat-grid, .card-grid { flex-direction: column; }
+}
+
+/* ========== 打印优化 ========== */
+@media print {
+  body {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #f4f7fb;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body::before { display: none; }
+  .title, .end_page { border-radius: 0; box-shadow: none; }
+  .doc-section, .card, .stat, .table-wrap { box-shadow: none; border: 1px solid #dbe4ef; }
+  section { break-inside: auto !important; }
+}
+</style>
+</head>
+<body class="mode-doc" data-palette="ink-blue">
+
+  <section class="title">
+    <h1>DeepSeek Harness 引擎接入报告</h1>
+    <div class="accent-line"></div>
+    <p>灵标（CursorMind）执行引擎升级：codex.exe 通道 → 官方 dsh headless</p>
+    <p>2026 年 10 月 29 日 · 实测驱动 · 全链路已验证</p>
+  </section>
+
+  <h1 class="heading">一、结论速览</h1>
+  <div class="doc-section">
+    <p class="paragraph">DeepSeek Harness（官方 CLI 命令 dsh，npm 包 @deepseek-ai/dsh，MIT 协议）已作为灵标的执行引擎接入，替换此前借用的 heyClicky codex.exe 通道。接入方式为子进程 spawn：dsh headless profile 一次性应答任务，NDJSON 事件流实时映射到灵标气泡、回复面板与托盘忙态。CLI 双实验与 Electron 主进程端到端实测全部通过，单任务成本约一分钱。</p>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="num">3</div>
+        <div class="label">实测任务全部通过</div>
+      </div>
+      <div class="stat">
+        <div class="num">6605</div>
+        <div class="label">典型任务 tokens（约一分钱）</div>
+      </div>
+      <div class="stat">
+        <div class="num">4</div>
+        <div class="label">内置工具 write/read/glob/pwsh</div>
+      </div>
+      <div class="stat">
+        <div class="num">1</div>
+        <div class="label">新增源码文件 dshRunner.ts</div>
+      </div>
+    </div>
+  </div>
+
+  <h1 class="heading">二、背景与决策</h1>
+  <div class="doc-section">
+    <h2 class="heading">2.1 为什么要换引擎</h2>
+    <ul class="list">
+      <li><strong>卸载依赖风险</strong>：旧通道借用的 codex.exe 位于 heyClicky 安装目录（C:\Users\...\HeyClickyApp\current\CodexRuntime\bin），heyClicky 一旦卸载或升级换目录，灵标执行引擎即断链。</li>
+      <li><strong>协议适配成本</strong>：codex-cli 0.152.1 已删除 chat wire_api，只支持 Responses API；DeepSeek V4-Flash 虽已原生适配，但 codex.exe 是为 OpenAI 生态设计的通用 CLI，模型元数据告警（Model metadata not found）持续存在。</li>
+      <li><strong>厂商一致性</strong>：dsh 是 DeepSeek 自家出品的官方 harness，「框架 + 模型 + API」同厂同源，未来演进（缓存、计费、工具协议）优先保障。</li>
+      <li><strong>工程正当性</strong>：heyClicky 的核心架构正是「嵌入开源 harness 当执行引擎」；灵标直接采用官方开源 harness，路径一致且完全合规（MIT 协议，无反编译、无内部配置泄露）。</li>
+    </ul>
+  </div>
+  <div class="doc-section alt">
+    <h2 class="heading">2.2 dsh 是什么</h2>
+    <p class="paragraph">DeepSeek Harness 是 DeepSeek AI 于 2026 年 8 月 13 日与 V4 Pro 同日开源的 Agent 运行框架，采用「一切皆插件」（everything-is-a-plugin）架构，由 Cordis 微内核驱动——模型、工具、沙箱策略、多 Agent 协调、会话存储均以插件形式挂载。CLI 命令为 dsh，提供四种运行形态：Web UI（默认 http://127.0.0.1:3080）、桌面端（Electron）、TUI 终端、headless 无头模式。灵标采用的是 headless 模式：答案上 stdout、诊断上 stderr、--json 输出机器可读事件流，天然适配子进程集成。</p>
+    <aside class="callout" data-variant="warning">
+      <p>包名验证中的陷阱：npm 上的 dsh（1.0.1）是第三方 JavaScript shell 工具（infusion/node-dsh），deepseek-harness（0.0.1）是占位包。官方包是带 scope 的 <strong>@deepseek-ai/dsh</strong>，安装前务必核对 repository 字段。</p>
+    </aside>
+  </div>
+
+  <h1 class="heading">三、实测验证</h1>
+  <div class="doc-section">
+    <h2 class="heading">3.1 CLI 直测（两级实验）</h2>
+    <ol class="timeline">
+      <li>
+        <strong>实验一：建文件 + 读回确认</strong>
+        <p>任务「创建 dsh-test.txt，内容写 dsh引擎验证OK，然后读取确认」。引擎自主执行 write → read 两步，最终回复「已创建...读取确认内容为 dsh引擎验证OK，与要求一致」。总用量 6605 tokens（含缓存命中 6400）。</p>
+      </li>
+      <li>
+        <strong>实验二：写代码 + 执行验证（能力上限探测）</strong>
+        <p>任务「创建 fib.js 实现 fibonacci，用 node 执行打印 fib(10)」。引擎先 glob 查重，发现昨日 codex 测试遗留的 fib.js 且实现正确，直接复用，调用 pwsh 工具执行 node .\fib.js，终端输出 55。shell 执行能力确认，headless 并非只读沙盒。总用量 6938 tokens。</p>
+      </li>
+      <li>
+        <strong>实验三：Electron 主进程端到端</strong>
+        <p>灵标带 CURSORMIND_DSH_TEST 自检钩子启动，3 秒后自动派发真实任务。hotkey.log 完整记录事件链：启动 → session → 执行:写文件 dsh-demo.txt → 执行:读 dsh-demo.txt → final → turn 完成 in=1015 out=228。桌面「灵标工作区」产出 dsh-demo.txt（29 字节，UTF-8 内容逐字正确）。</p>
+      </li>
+    </ol>
+    <h2 class="heading">3.2 headless 事件流协议（实测采样）</h2>
+    <pre class="code" data-lang="json"><code>{"type":"session","sessionId":"session-e938...","cwd":"C:\\...\\ds-codex-test"}
+{"type":"status","phase":"turn_start","turn":1}
+{"type":"status","phase":"step_start","turn":1,"step":1}
+{"type":"thinking","text":"Simple task: create file, read it."}
+{"type":"tool_call","callId":"call_00_...","tool":"write","input":{"file_path":"...","content":"..."}}
+{"type":"tool_result","callId":"call_00_...","status":"completed","result":"..."}
+{"type":"status","phase":"step_end","turn":1,"step":1,"usage":{"inputTokens":6272,"outputTokens":93,...}}
+{"type":"text","text":"已完成：..."}
+{"type":"status","phase":"turn_end","turn":1,"reason":{"kind":"completed"}}
+{"type":"final","text":"已完成：..."}</code></pre>
+    <div class="table-wrap">
+      <div class="table-caption">dsh headless 事件类型与灵标侧映射</div>
+      <table class="table" data-caption="dsh headless 事件类型与灵标侧映射">
+        <colgroup><col style="width:22%"><col style="width:34%"><col style="width:44%"></colgroup>
+        <thead>
+          <tr><th>事件类型</th><th>载荷要点</th><th>灵标侧处理</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>session</td><td>sessionId、cwd</td><td>气泡「引擎连接」+ 日志锚定</td></tr>
+          <tr><td>status</td><td>phase: turn/step 起止 + usage</td><td>step_end 累计 token 用量</td></tr>
+          <tr><td>thinking</td><td>模型思考文本</td><td>暂不展示（保留诊断价值）</td></tr>
+          <tr><td>tool_call</td><td>tool + input</td><td>气泡「执行: 写文件 xxx / node 命令」</td></tr>
+          <tr><td>tool_result</td><td>调用结果 XML</td><td>仅日志记录</td></tr>
+          <tr><td>text</td><td>中间叙述</td><td>暂存（final 兜底覆盖）</td></tr>
+          <tr><td>final</td><td>最终答复全文</td><td>回复面板 + 语音朗读 + 气泡摘要</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h1 class="heading">四、接入实现</h1>
+  <div class="doc-section">
+    <h2 class="heading">4.1 架构分工（双引擎）</h2>
+    <div class="card-grid" data-cols="2">
+      <div class="card">
+        <h3>agent.ts · 视觉教学引擎</h3>
+        <p>「教我怎么用」：截图 + Qwen3-VL locate + 精灵指路，人在回路。毫秒级交互，短上下文，qwen-plus/DeepSeek 单轮调用。</p>
+      </div>
+      <div class="card">
+        <h3>dshRunner.ts · 执行交付引擎</h3>
+        <p>「帮我干」：dsh headless 自主建文件、写代码、跑命令，工具循环与纠错全部由 harness 承担，灵标只收事件流与交付物。</p>
+      </div>
+    </div>
+    <h2 class="heading">4.2 调用形态与关键设计</h2>
+    <pre class="code" data-lang="bash"><code># 灵标主进程实际派发的命令形态
+cmd /c npx -y @deepseek-ai/dsh --profile headless --json -
+# 任务文本经 stdin 喂入（dsh 以 "-" 读 stdin），规避命令行中文与引号转义问题
+# env: 继承进程环境（DEEPSEEK_API_KEY 已由 .env 注入）
+# cwd: 桌面\灵标工作区（交付物用户直接可见）</code></pre>
+    <ul class="list">
+      <li><strong>stdin 传任务</strong>：dsh headless 支持 - 从标准输入读取任务文本，中文与特殊字符零转义损耗。</li>
+      <li><strong>cmd /c 中转</strong>：Windows 上 npx 是 .cmd 脚本，Node 20+ 出于安全禁止直接 spawn .cmd，经 cmd.exe 中转是标准做法。</li>
+      <li><strong>树式终止</strong>：cmd→node→dsh 是三层进程树，取消任务（Esc / 新对话）用 taskkill /T /F 杀全树，防孤儿进程。</li>
+      <li><strong>硬超时</strong>：默认 180 秒（CURSORMIND_DSH_TIMEOUT_MS 可调），harness 卡死不拖垮精灵。</li>
+      <li><strong>单任务模型</strong>：generation 计数器 + killTree，与 agent.ts 同构，新一轮自动取消上一轮。</li>
+      <li><strong>朗读净化</strong>：语音朗读前剥离 markdown 代码围栏，避免代码块被逐字读出。</li>
+    </ul>
+    <h2 class="heading">4.3 意图路由</h2>
+    <p class="paragraph">routeVoice 五层路由前置新增工作任务分流：正则命中「写/创建/生成/整理 + 文件/脚本/代码/文档」类动词宾语且不含「教我/怎么」教学词，即走 dsh 通道；教学类请求仍走视觉引导引擎，两类体验互不干扰。</p>
+  </div>
+
+  <h1 class="heading">五、新旧引擎对比</h1>
+  <div class="table-wrap">
+    <div class="table-caption">codex.exe 通道 vs dsh 通道</div>
+    <table class="table" data-caption="codex.exe 通道 vs dsh 通道">
+      <colgroup><col style="width:16%"><col style="width:42%"><col style="width:42%"></colgroup>
+      <thead>
+        <tr><th>维度</th><th>codex.exe（旧）</th><th>dsh headless（新）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>来源</td><td>OpenAI Codex CLI，借 heyClicky 副本</td><td>DeepSeek 官方 harness，npm 直装</td></tr>
+        <tr><td>依赖风险</td><td>heyClicky 卸载即断链</td><td>npm cache / 项目依赖，自主可控</td></tr>
+        <tr><td>协议</td><td>Responses API（元数据告警）</td><td>官方原生，无告警</td></tr>
+        <tr><td>工具集</td><td>shell（PowerShell 转译执行）</td><td>write/read/glob/pwsh 内置</td></tr>
+        <tr><td>事件流</td><td>item.started/completed 粗粒度</td><td>tool_call/result + thinking 细粒度</td></tr>
+        <tr><td>任务输入</td><td>命令行参数（转义风险）</td><td>stdin 直读（零转义）</td></tr>
+        <tr><td>体积</td><td>codex.exe 279MB</td><td>Node 包，按需下载</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h1 class="heading">六、风险与后续</h1>
+  <div class="doc-section">
+    <ul class="list">
+      <li><strong>开发者预览版</strong>：官方明示「THERE WILL BE COMPATIBILITY-BREAKING CHANGES」。升级前需回归 headless 事件流格式；建议锁版本（npx -y @deepseek-ai/dsh@x.y.z）。</li>
+      <li><strong>npx 启动开销</strong>：每次任务经 npx 解析，冷启动约 2-5 秒。优化路径：npm i 将包固化为项目依赖，直接调 node_modules 内 bin；或预热常驻 dsh 守护进程。</li>
+      <li><strong>DSH_HOME 隔离</strong>：当前使用默认配置目录，会话与凭据与用户其他 dsh 使用场景共享。后续可设 DSH_HOME 到 app userData 实现灵标专属隔离。</li>
+      <li><strong>安全边界</strong>：headless 可执行任意 pwsh 命令（实测已确认）。当前靠工作目录收敛 + 意图白名单约束；正式发布前应叠加任务级风险提示（删除/外发类命令先确认）。</li>
+      <li><strong>待提交</strong>：dshRunner.ts + index.ts 路由改动尚未入 git，与球缩小、开关链路等改动一起待真人语音实测后统一提交推送。</li>
+    </ul>
+  </div>
+
+  <div class="divider"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
+
+  <section class="title end_page">
+    <h1>引擎就位，精灵出海</h1>
+    <p>教我做，agent.ts 指路；帮我干，dsh 交付。</p>
+    <p>灵标（CursorMind）· 电信杯 TeleAgent 高校 AI 创新大赛</p>
+  </section>
+
+</body>
+</html>

@@ -65,6 +65,10 @@ contextBridge.exposeInMainWorld('cursormind', {
   onPanelAudio(cb: (src: string) => void): void {
     ipcRenderer.on('panel:audio', (_e, src) => cb(src));
   },
+  /** 接收桌面截屏（面板展开时主进程推一次，做液态玻璃背景实层） */
+  onPanelBackdrop(cb: (dataUrl: string) => void): void {
+    ipcRenderer.on('panel:backdrop', (_e, dataUrl) => cb(dataUrl));
+  },
   /** 透明区域穿透切换（v=true 穿透给下层应用） */
   setIgnore(v: boolean): void {
     ipcRenderer.send('panel:set-ignore', v);
@@ -87,6 +91,14 @@ contextBridge.exposeInMainWorld('cursormind', {
   setAutoReplace(on: boolean): void {
     ipcRenderer.send('panel:auto-replace', on);
   },
+  /** 灵标球可见性开关（设置面板；隐藏 = 只关跟随球，功能链路保留） */
+  setOrbVisible(on: boolean): void {
+    ipcRenderer.send('panel:orb-visible', on);
+  },
+  /** 语音热词表（设置面板，逗号分隔字符串） */
+  setHotwords(words: string): void {
+    ipcRenderer.send('panel:hotwords', words);
+  },
 
   // —— 通用 ——
   dismiss(): void {
@@ -95,5 +107,71 @@ contextBridge.exposeInMainWorld('cursormind', {
   /** 渲染层错误上报（主进程写日志，用于诊断） */
   reportError(msg: string): void {
     ipcRenderer.send('sprite:error', String(msg).slice(0, 4000));
+  },
+
+  // —— 灵标看板（便签）——
+  onBoardData(cb: (data: unknown) => void): void {
+    ipcRenderer.on('board:data', (_e, data) => cb(data));
+  },
+  onBoardSynced(cb: (data: unknown) => void): void {
+    ipcRenderer.on('board:synced', (_e, data) => cb(data));
+  },
+  onBoardState(cb: (s: { docked?: boolean; expanded?: boolean }) => void): void {
+    ipcRenderer.on('board:state', (_e, s) => cb(s));
+  },
+  boardLoad(): void {
+    ipcRenderer.send('board:load');
+  },
+  boardSave(tasks: unknown): void {
+    ipcRenderer.send('board:save', tasks);
+  },
+  boardDrag(offset: { x: number; y: number }): void {
+    ipcRenderer.send('board:drag', offset);
+  },
+  boardDrop(): void {
+    ipcRenderer.send('board:drop');
+  },
+  boardExpand(): void {
+    ipcRenderer.send('board:expand');
+  },
+  boardCollapse(): void {
+    ipcRenderer.send('board:collapse');
+  },
+  boardHide(): void {
+    ipcRenderer.send('board:hide');
+  },
+
+  // —— 后台任务条（多 Agent 作业小提示）——
+  onTaskData(cb: (json: string, expandedJson: string) => void): void {
+    ipcRenderer.on('taskstrip:data', (_e, json, expandedJson) => cb(json, expandedJson));
+  },
+  taskstripLoad(): void {
+    ipcRenderer.send('taskstrip:load');
+  },
+  taskstripExpandToggle(): void {
+    ipcRenderer.send('taskstrip:expand');
+  },
+  taskstripCancel(id: string): void {
+    ipcRenderer.send('taskstrip:cancel', id);
+  },
+  taskstripView(id: string): void {
+    ipcRenderer.send('taskstrip:view', id);
+  },
+  taskstripRemove(id: string): void {
+    ipcRenderer.send('taskstrip:remove', id);
+  },
+  taskstripClearDone(): void {
+    ipcRenderer.send('taskstrip:clear-done');
+  },
+
+  // —— MCP（飞书）——
+  onMcpData(cb: (cfg: { enabled: boolean; feishu: { token: string; tools: string } }) => void): void {
+    ipcRenderer.on('mcp:data', (_e, cfg) => cb(cfg));
+  },
+  mcpGet(): void {
+    ipcRenderer.send('mcp:get');
+  },
+  mcpSave(partial: unknown): void {
+    ipcRenderer.send('mcp:save', partial);
   },
 });

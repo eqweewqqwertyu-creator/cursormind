@@ -20,7 +20,8 @@
     }
 
     /* ---------- Morph 面板（搜索 / 设置 共用形态）：从底部中央小圆点展开 ----------
-       材质与球同源：液态玻璃（半透白 + backdrop 磨砂 + 白描边 + 蓝调柔光）。
+       液态玻璃（用户 glass.html 方案移植）：磨砂 + 顶部高光 + 鼠标聚光 + 双色差层 + 弹性拉扯。
+       背景实层用主进程截屏（透明窗口取不到桌面像素，tint/chroma 的 backdrop-filter 以它为磨砂源）。
        橙色已退场，仅保留在会改写用户内容的动作上（textcard 替换）。 */
     .panel {
       position: absolute;
@@ -29,19 +30,79 @@
       width: 56px;
       height: 56px;
       border-radius: 28px;
-      background: rgba(255, 255, 255, 0.82);
-      backdrop-filter: blur(18px) saturate(1.2);
-      -webkit-backdrop-filter: blur(18px) saturate(1.2);
-      border: 1px solid rgba(255, 255, 255, 0.9);
+      background: transparent; /* 背景由玻璃层叠出，容器本体透明 */
+      border: 1px solid rgba(255, 255, 255, 0.18);
       box-shadow:
         0 0 24px rgba(160, 190, 235, 0.35),
-        0 6px 20px rgba(40, 60, 100, 0.14),
-        inset 0 1px 3px rgba(255, 255, 255, 0.9);
+        0 6px 20px rgba(40, 60, 100, 0.14);
       overflow: hidden;
       visibility: hidden;
+      isolation: isolate; /* 圈定 mix-blend 作用域（glass.html 同款） */
       will-change: width, height, border-radius, transform;
     }
     .panel.visible { visibility: visible; }
+
+    /* 背景实层：桌面截屏（tint/chroma 磨砂的采样源） */
+    .lg-bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center bottom;
+      opacity: 0; /* 拿到截屏前隐藏，避免黑底 */
+      transition: opacity 0.2s ease;
+    }
+    .lg-bg.ready { opacity: 1; }
+
+    /* 乳白玻璃层（glass.html rect-white：rgba(255,255,255,.78) + blur 18） */
+    .lg-tint {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    /* 色差层：screen 混合 + 色相偏移，随鼠标错位 ±1.1px 出彩色镶边（glass.html .chroma） */
+    .chroma {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      pointer-events: none;
+      mix-blend-mode: screen;
+      z-index: 2;
+    }
+    .chroma-r { filter: saturate(1.4) hue-rotate(-20deg); }
+    .chroma-b { filter: saturate(1.4) hue-rotate(140deg); }
+
+    /* 固定顶部高光（glass.html .liquid-glass::before 同款） */
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 45%);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* 鼠标动态聚光（glass.html .spot-light 同款） */
+    .spot-light {
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 70%);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .panel:hover .spot-light { opacity: 1; }
 
     .panel-inner {
       position: absolute;
@@ -51,10 +112,61 @@
       opacity: 0;
       transform: translateY(10px);
       transition: opacity 0.26s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 5;
     }
     .panel.landed .panel-inner { opacity: 1; transform: translateY(0); }
 
     /* ---------- 搜索面板内容 ---------- */
+    /* 打字模式（compact）：Gemini 式横向小卡——只留输入行 + 预设问题排，贴鼠标右下角 */
+    .panel.compact .reply { display: none !important; }
+    .panel.compact #reset { display: none; }
+    .panel.compact .askrow { padding: 12px 14px; }
+    #quickRow {
+      display: none;
+      flex: none;
+      padding: 0 12px 10px;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .panel.compact #quickRow { display: flex; }
+    .quick-btn {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      color: #5A6982;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: all 0.15s ease;
+    }
+    .quick-btn:hover { background: rgba(124, 147, 184, 0.22); border-color: rgba(124, 147, 184, 0.5); }
+    /* 发送按钮（Gemini 式：输入框右端向右箭头） */
+    .send-btn {
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1.5px solid #E8E8E8;
+      background: #FAFAFA;
+      color: #8C8C8C;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      font-family: inherit;
+      padding: 0;
+    }
+    .send-btn:hover { border-color: #7C93B8; background: #7C93B8; color: #fff; }
+
     .reply {
       display: none;
       padding: 12px 16px;
@@ -150,6 +262,20 @@
     }
     .row .k { color: #8C8C8C; }
     .row .v { display: flex; align-items: center; gap: 6px; }
+    .row.hint { justify-content: flex-start; font-size: 11.5px; color: #B0B0B0; }
+    .row.hint .k { color: #B0B0B0; }
+    .hotwords-input {
+      width: 150px;
+      font-size: 12px;
+      color: #3F3F46;
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid rgba(140, 140, 140, 0.3);
+      border-radius: 7px;
+      padding: 3px 8px;
+      outline: none;
+    }
+    .hotwords-input:focus { border-color: #7C93B8; background: rgba(255, 255, 255, 0.8); }
+    .hotwords-input::placeholder { color: #B0B0B0; }
     .pill {
       font-size: 11px;
       padding: 2px 9px;
@@ -338,6 +464,11 @@
   <div id="stage">
     <!-- 搜索面板（morph 从底部中央小圆点长出） -->
     <div id="searchPanel" class="panel">
+      <div class="lg-bg" id="lgBgSearch"></div>
+      <div class="lg-tint"></div>
+      <div class="chroma chroma-r"></div>
+      <div class="chroma chroma-b"></div>
+      <div class="spot-light"></div>
       <div class="panel-inner">
         <div class="reply" id="reply"></div>
         <div class="askrow hit">
@@ -346,13 +477,24 @@
           </div>
           <input id="q" placeholder="问一句，比如「微信设置在哪」" autocomplete="off" spellcheck="false" />
           <div class="mic-btn hit" id="micInline" title="按住说话"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="17.5" x2="12" y2="21"/></svg></div>
+          <button class="send-btn hit" id="btnSend" title="发送（Enter）">→</button>
           <div class="reset-btn" id="reset" title="重置对话（Ctrl+R）">↻</div>
+        </div>
+        <div id="quickRow">
+          <button class="quick-btn hit" data-q="这是什么">↷ 这是什么？</button>
+          <button class="quick-btn hit" data-q="怎么操作这个">↷ 怎么操作这个？</button>
+          <button class="quick-btn hit" data-q="打开设置">↷ 打开设置</button>
         </div>
       </div>
     </div>
 
     <!-- 设置面板（morph 长出） -->
     <div id="settingsPanel" class="panel">
+      <div class="lg-bg" id="lgBgSettings"></div>
+      <div class="lg-tint"></div>
+      <div class="chroma chroma-r"></div>
+      <div class="chroma chroma-b"></div>
+      <div class="spot-light"></div>
       <div class="panel-inner">
         <div class="settings hit">
           <button class="panel-close hit" id="btnCloseSettings" title="关闭设置">×</button>
@@ -360,13 +502,20 @@
           <div class="row"><span class="k">大脑 · 意图理解</span><span class="v" id="metaBrain"><span class="pill no">未配置</span></span></div>
           <div class="row"><span class="k">眼睛 · 视觉定位</span><span class="v" id="metaEye"><span class="pill no">未配置</span></span></div>
           <div class="row"><span class="k">嘴 · 语音播报</span><span class="v"><label class="switch hit"><input type="checkbox" id="chkVoice" checked /><span class="slider"></span></label></span></div>
+          <div class="row"><span class="k">关闭灵标显示</span><span class="v"><label class="switch hit"><input type="checkbox" id="chkOrb" checked /><span class="slider"></span></label></span></div>
+          <div class="row hint"><span class="k">（取消勾选 = 隐藏浮球，语音/热键等后台功能保留）</span></div>
           <div class="row"><span class="k">划选优化 · 自动替换</span><span class="v"><label class="switch hit"><input type="checkbox" id="chkAutoReplace" /><span class="slider"></span></label></span></div>
+          <div class="row"><span class="k">语音热词 · 逗号分隔</span><span class="v"><input type="text" id="inHotwords" class="hotwords-input hit" placeholder="枸杞子, 灵标" /></span></div>
           <div class="row"><span class="k">召唤 / 引导继续</span><span class="v"><span class="kbd">Ctrl+Alt+E</span><span class="kbd">Ctrl+Alt+N</span></span></div>
           <div class="row"><span class="k">语音 / 打字</span><span class="v"><span class="kbd">~ 短按</span><span class="kbd">~ 长按</span></span></div>
           <div class="row"><span class="k">优化 / 剪切 / 复制 / 删除</span><span class="v"><span class="kbd">Ctrl+Alt+O</span><span class="kbd">X</span><span class="kbd">C</span><span class="kbd">D</span></span></div>
           <div class="row"><span class="k">粘贴 / 撤销</span><span class="v"><span class="kbd">Ctrl+Alt+V</span><span class="kbd">Ctrl+Alt+Z</span></span></div>
           <div class="row"><span class="k">语音可说</span><span class="v"><span class="kbd">复制/删除/全选/撤销</span><span class="kbd">粘贴到这</span></span></div>
           <div class="row"><span class="k">退场 / 重置对话</span><span class="v"><span class="kbd">Esc</span><span class="kbd">Ctrl+R</span></span></div>
+          <div class="row mcp-title"><span class="k">MCP · 飞书</span><span class="v"><label class="switch hit"><input type="checkbox" id="chkMcp" /><span class="slider"></span></label></span></div>
+          <div class="row hint"><span class="k">（给灵标接飞书：云文档搜索/创建/更新等；需飞书开放平台自建应用）</span></div>
+          <div class="row"><span class="k">飞书 Token</span><span class="v"><input type="password" id="inMcpToken" class="hotwords-input hit" placeholder="t- 或 u- 开头" autocomplete="off" /></span></div>
+          <div class="row hint"><span class="k">（在飞书开放平台创建自建应用、申请权限后取得 TAT/UAT）</span></div>
           <div class="actions">
             <button class="btn primary hit" id="btnResetConv">重置对话</button>
             <button class="btn hit" id="btnTestFly">精灵自检</button>

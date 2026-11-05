@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵标 CursorMind · 视频演示文案（4 分钟完整版）</title>
+<style>
+  :root {
+    --ink: #1A1A1A;
+    --ink-2: #444;
+    --ink-3: #8C8C8C;
+    --accent: #F97316;
+    --accent-soft: #FFF7ED;
+    --blue: #7C93B8;
+    --blue-soft: #EEF2F8;
+    --line: #E4E4E7;
+    --paper: #FFFFFF;
+    --paper-2: #FAFAFA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: #F1F3F6;
+    line-height: 1.75;
+    padding: 40px 16px;
+  }
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--paper);
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(40,60,100,.12);
+    padding: 56px 64px 48px;
+  }
+
+  /* ---------- 封面 ---------- */
+  .cover { text-align: center; padding-bottom: 36px; border-bottom: 1px solid var(--line); margin-bottom: 36px; }
+  .cover .tag {
+    display: inline-block; font-size: 12px; letter-spacing: 2px;
+    color: var(--ink-3); border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 14px; margin-bottom: 18px;
+  }
+  .cover h1 { font-size: 30px; letter-spacing: 1px; margin-bottom: 10px; }
+  .cover h1 .dot { color: var(--accent); }
+  .cover .sub { color: var(--ink-3); font-size: 14px; }
+  .cover .meta { margin-top: 20px; font-size: 12.5px; color: var(--ink-3); }
+
+  /* ---------- 通用 ---------- */
+  h2 {
+    font-size: 20px; margin: 44px 0 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2::before {
+    content: ''; width: 10px; height: 10px; border-radius: 3px;
+    background: linear-gradient(135deg, #F97316, #FB923C); flex: none;
+  }
+  h2 + .lead { color: var(--ink-3); font-size: 13px; margin-bottom: 18px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; font-size: 13.5px; }
+  th {
+    text-align: left; font-weight: 600; color: var(--ink-2);
+    background: var(--paper-2); border-bottom: 2px solid var(--line);
+    padding: 10px 12px; white-space: nowrap;
+  }
+  td { border-bottom: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.time { white-space: nowrap; color: var(--ink-3); font-variant-numeric: tabular-nums; width: 110px; }
+  td.time b { color: var(--ink); font-size: 14px; }
+
+  /* ---------- 分镜卡片 ---------- */
+  .scene {
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 24px; margin: 18px 0;
+    background: var(--paper);
+    box-shadow: 0 2px 10px rgba(40,60,100,.04);
+  }
+  .scene-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .scene-no {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: var(--blue); border-radius: 999px; padding: 2px 12px; white-space: nowrap;
+  }
+  .scene-time { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .scene-title { font-size: 16.5px; font-weight: 600; }
+  .scene-title .hl { color: var(--accent); }
+
+  .field { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--ink-3); margin: 12px 0 5px; }
+  .visual {
+    background: var(--blue-soft); border-left: 3px solid var(--blue);
+    border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 13px; color: var(--ink-2);
+  }
+  .vo {
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 14px; color: var(--ink);
+  }
+  .vo p { margin: 0 0 10px; }
+  .vo p:last-child { margin-bottom: 0; }
+  .vo .gap { color: var(--ink-3); }
+
+  /* ---------- 提示框 ---------- */
+  .note {
+    display: flex; gap: 12px; align-items: flex-start;
+    border: 1px solid #FECDCA; background: #FEF3F2;
+    border-radius: 12px; padding: 14px 16px; margin: 14px 0; font-size: 13.5px;
+  }
+  .note.warn { border-color: #FDE68A; background: #FFFBEB; }
+  .note .icon { flex: none; font-size: 16px; line-height: 1.4; }
+  .note b { color: #B42318; }
+  .note.warn b { color: #B45309; }
+
+  .quote {
+    text-align: center; padding: 26px 20px; margin: 26px 0;
+    background: linear-gradient(135deg, #FFF7ED, #F5F7FB);
+    border: 1px dashed rgba(249,115,22,.4); border-radius: 14px;
+  }
+  .quote .line1 { font-size: 19px; font-weight: 700; letter-spacing: 2px; }
+  .quote .line2 { font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+
+  /* ---------- 60秒版 ---------- */
+  .sixty {
+    background: var(--paper-2); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px 28px; margin-top: 16px;
+  }
+  .sixty .vo p { margin-bottom: 10px; }
+
+  footer {
+    margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--ink-3); text-align: center;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; border-radius: 0; padding: 24px 8px; }
+    .scene { break-inside: avoid; }
+    .note { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 封面 -->
+  <div class="cover">
+    <div class="tag">VIDEO SCRIPT · 演示视频脚本</div>
+    <h1>灵标 CursorMind<span class="dot">.</span></h1>
+    <div class="sub">产品演示视频文案 —— 有意识的光标，会指路的精灵</div>
+    <div class="meta">完整版约 3 分半口播 + 演示留白 · 总长 4 分钟内 · 附 60 秒极简版</div>
+  </div>
+
+  <!-- ================= 完整分镜脚本 ================= -->
+  <h2>一、完整分镜脚本</h2>
+  <p class="lead">七个段落，节奏为「痛点 → 亮相 → 三连演示 → 收尾」，核心卖点（分步教学）放在最重的位置。</p>
+
+  <table>
+    <thead>
+      <tr><th>时间</th><th>段落</th><th>功能演示</th><th>时长</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="time"><b>0:00</b>-0:20</td><td>开场钩子</td><td>痛点代入（找不到按钮的迷失感）</td><td>20s</td></tr>
+      <tr><td class="time"><b>0:20</b>-0:45</td><td>产品亮相</td><td>精灵球飞入待机</td><td>25s</td></tr>
+      <tr><td class="time"><b>0:45</b>-1:30</td><td>演示一 · 核心卖点</td><td>语音提问 + 视觉指路 + 分步引导</td><td>45s</td></tr>
+      <tr><td class="time"><b>1:30</b>-1:55</td><td>演示二</td><td>打字模式（贴鼠标小卡）</td><td>25s</td></tr>
+      <tr><td class="time"><b>1:55</b>-2:25</td><td>演示三（可选）</td><td>圈选识别「这是什么」</td><td>30s</td></tr>
+      <tr><td class="time"><b>2:25</b>-2:55</td><td>演示四</td><td>语音执行 + 后台任务条</td><td>30s</td></tr>
+      <tr><td class="time"><b>2:55</b>-3:15</td><td>演示五</td><td>划选优化一键替换</td><td>20s</td></tr>
+      <tr><td class="time"><b>3:15</b>-3:50</td><td>收尾升华</td><td>金句字幕卡收尾</td><td>35s</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 分镜 1 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 1</span>
+      <span class="scene-title">开场钩子 —— 痛点代入</span>
+      <span class="scene-time">0:00 - 0:20</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">录屏一个复杂软件界面（Chrome 开发者工具 / Excel 函数栏），鼠标在菜单层里来回找按钮，找不到，来回点。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>每次打开一个不熟的软件，你最怕什么？按钮藏在菜单第三层，快捷键背了就忘，教程看了十遍，上手还是懵。</p>
+      <p class="gap">（停半拍）</p>
+      <p>如果——你的鼠标会说话呢？</p>
+    </div>
+  </div>
+
+  <!-- 分镜 2 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 2</span>
+      <span class="scene-title">产品亮相 —— 一句话定位</span>
+      <span class="scene-time">0:20 - 0:45</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">白色小精灵球从屏幕边缘飞入，落在鼠标旁边待机（呼吸微光）。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>这是灵标，CursorMind——一个蹲在你鼠标旁边的 AI 小精灵。</p>
+      <p>它和别的 AI 助手不一样：<b>它不替你操作电脑，它教你，下次自己就会。</b></p>
+    </div>
+  </div>
+
+  <!-- 分镜 3 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 3</span>
+      <span class="scene-title">演示一 · 语音问、视觉指路<span class="hl">（核心卖点，给足时间）</span></span>
+      <span class="scene-time">0:45 - 1:30</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">Chrome 打开设置页。单击 ~ 说话「怎么打开开发者工具」→ 灵标球飞过去圈住目标按钮 → 气泡弹出步骤说明 → 用户照做 → 双击 ~ → 灵标重新看屏幕、教下一步。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>按一下 ~ 键，直接开口问：「怎么打开开发者工具？」</p>
+      <p>灵标看一眼你的屏幕——注意，它不装任何插件、不做任何适配，纯靠"看"——然后飞过去，圈住那个按钮，告诉你：点这里。</p>
+      <p>你做完这一步，双击 ~ 键。它重新看一眼屏幕，确认你做对了，再教你下一步。</p>
+      <p>就像身边坐着一个耐心的大神，手把手带你，直到你学会。</p>
+    </div>
+  </div>
+
+  <!-- 分镜 4 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 4</span>
+      <span class="scene-title">演示二 · 打字模式 —— 贴着鼠标弹出的小卡</span>
+      <span class="scene-time">1:30 - 1:55</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">长按 ~ ，Gemini 式横向小卡从鼠标右下角弹出，打字输入，或点下方预设问题胶囊。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>不方便说话？长按 ~ 键——一张小输入卡贴着你的鼠标弹出来，打字问，一样好使。</p>
+    </div>
+  </div>
+
+  <!-- 分镜 5 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 5</span>
+      <span class="scene-title">演示三 · 圈选识别<span class="hl">（可选，见注意事项）</span></span>
+      <span class="scene-time">1:55 - 2:25</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">鼠标按住画圈圈住屏幕上一个不认识的图标 → 橙色圈亮起 → 问「我圈住的是什么」→ 灵标回答。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>屏幕上有个东西不认识？按住鼠标画个圈，问它「这是什么」——灵标看一眼圈里的内容，直接告诉你。</p>
+    </div>
+  </div>
+
+  <!-- 分镜 6 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 6</span>
+      <span class="scene-title">演示四 · 语音执行 —— 它也会替你干活</span>
+      <span class="scene-time">2:25 - 2:55</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">说「帮我写个脚本，把今天的会议纪要整理成清单」→ 灵标气泡「后台开工」→ 右上角任务条显示「执行中·第 N 步」→ 完成后文件出现在桌面「灵标工作区」。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>当然，真需要动手的时候，它也绝不含糊。</p>
+      <p>说一句「帮我写个脚本，整理今天的会议纪要」——灵标在后台开工，任务条实时显示进度，几秒钟，文件就躺在你的桌面工作区里。</p>
+      <p>会教，也能干。这就是一个完整的 AI 队友。</p>
+    </div>
+  </div>
+
+  <!-- 分镜 7 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 7</span>
+      <span class="scene-title">演示五 · 划选优化 —— 工作中的小彩蛋</span>
+      <span class="scene-time">2:55 - 3:15</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">在文档里划选一段话，说「帮我改顺一点」→ 优化卡片弹出对比 → 点橙色「替换」按钮。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>写方案词穷了？划选一段话，说「帮我改顺一点」，一键替换。</p>
+    </div>
+  </div>
+
+  <!-- 分镜 8 -->
+  <div class="scene">
+    <div class="scene-header">
+      <span class="scene-no">段落 8</span>
+      <span class="scene-title">收尾升华</span>
+      <span class="scene-time">3:15 - 3:50</span>
+    </div>
+    <div class="field">画面</div>
+    <div class="visual">灵标球回到待机呼吸态；屏幕渐入字幕卡：「不替你干 · 教你下次自己干」。</div>
+    <div class="field">口播</div>
+    <div class="vo">
+      <p>市面上大多数 AI 助手都在替你点鼠标——用得越多，你越不会。</p>
+      <p>灵标反其道而行：<b>它教一次，你会一次。</b></p>
+      <p>因为最好的工具，不是让你依赖它，而是让你不再需要它。</p>
+      <p>灵标 CursorMind——有意识的光标，会指路的精灵。</p>
+    </div>
+  </div>
+
+  <div class="quote">
+    <div class="line1">不替你干 · 教你下次自己干</div>
+    <div class="line2">—— 全片唯一需要观众记住的一句话 ——</div>
+  </div>
+
+  <!-- ================= 拍摄要点 ================= -->
+  <h2>二、拍摄要点</h2>
+  <p class="lead">防翻车清单，录制前逐项打勾。</p>
+
+  <table>
+    <thead>
+      <tr><th>项目</th><th>建议</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>录屏</b></td><td>OBS 或 Win+G，1920×1080；提前把 Chrome 停在固定页面（如开发者工具已关的干净状态）</td></tr>
+      <tr><td><b>语音</b></td><td>麦克风单独录，环境安静；语速放慢，~ 键操作要利落</td></tr>
+      <tr><td><b>排练</b></td><td>开场那组「找按钮找不到」的迷失镜头单独录一次（故意演出来）</td></tr>
+      <tr><td><b>字幕</b></td><td>口播全文上字幕；关键步骤加高亮标注（「纯视觉，不装插件」）</td></tr>
+      <tr><td><b>兜底</b></td><td>语音识别万一翻车，改用打字小卡走同一条链路，观众看不出区别</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <div class="icon">⚠️</div>
+    <div>
+      <b>注意 1 · 圈画功能当前停用。</b>
+      演示三（圈选识别）依赖画圈功能，当前为默认停用状态。录制前设环境变量 <code>CURSORMIND_LASSO=1</code> 并重启灵标，录完关闭。若不需要这段演示，直接删除段落 5，总时长约 3 分 20 秒，节奏更紧凑。
+    </div>
+  </div>
+
+  <div class="note warn">
+    <div class="icon">🔔</div>
+    <div>
+      <b>注意 2 · 演示四（后台任务条）。</b>
+      依赖新接入的 BgTask 后台任务系统，录制前先完整跑一次「写脚本整理会议纪要」，确认任务条显示「执行中 · 第 N 步」且完成后文件正常出现在桌面「灵标工作区」，避免录制时首次冷启动拖节奏。
+    </div>
+  </div>
+
+  <!-- ================= 60 秒极简版 ================= -->
+  <h2>三、附：60 秒极简版</h2>
+  <p class="lead">如比赛限时 1 分钟，用这版——只保留「痛点 → 核心 → 金句」三段。</p>
+
+  <div class="sixty">
+    <div class="vo">
+      <p>每次在新软件里找不到功能？<span class="gap">（画面：菜单里迷失）</span></p>
+      <p>按一下 ~ 键问灵标：「这怎么弄？」<span class="gap">（语音提问）</span></p>
+      <p>它看一眼屏幕——不装插件，纯视觉——飞过去圈住按钮，教你点。<span class="gap">（定位圈选）</span></p>
+      <p>你做一步，它确认一步，直到你学会。<span class="gap">（分步引导）</span></p>
+      <p>真要动手，它也能帮你写脚本、跑任务。<span class="gap">（执行 + 任务条）</span></p>
+      <p><b>灵标：不替你干，教你下次自己干。</b><span class="gap">（收尾字幕）</span></p>
+    </div>
+  </div>
+
+  <footer>
+    灵标 CursorMind · 视频演示文案 · 2026-11 · 配合「启动灵标.bat」实际录制
+  </footer>
+</div>
+</body>
+</html>

@@ -55,8 +55,14 @@ export type SpriteCommand =
   | { type: 'toggleVoice' }
   // ~ 键双击：取消语音态并进入「引导下一步」（等价 Ctrl+Alt+N）
   | { type: 'dblNext' }
+  // 球可见性（设置面板「灵标球」开关）：隐藏跟随球，指令/指路/语音链路保留
+  | { type: 'setOrbVisible'; visible: boolean }
   // 语音识别结果（百炼 qwen3-asr-flash，主进程回推）
-  | { type: 'asrResult'; text: string };
+  | { type: 'asrResult'; text: string }
+  // 鼠标画圈：圈选激活（橙色笔迹 + 圈住区域；60s 有效，问答/超时/Esc 清除）
+  | { type: 'lasso'; rect: Rect; points: Array<{ x: number; y: number }>; bubble?: string }
+  // 圈选清除
+  | { type: 'lassoClear' };
 
 // 用户动作（适配器 → 主进程）
 export interface UserAction {

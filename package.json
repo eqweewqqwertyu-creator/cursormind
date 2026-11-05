@@ -17,6 +17,7 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
+    "@deepseek-ai/dsh": "^0.2.1-rc.2",
     "koffi": "^3.3.4",
     "ws": "^8.18.0"
   }

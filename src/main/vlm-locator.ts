@@ -1,5 +1,11 @@
 import type { Rect } from '../shared/types';
 import type { ScreenShot } from './screenshot';
+import { listElements, matchElement, localEyeEnabled } from './localEye';
+import { appendFileSync } from 'fs';
+
+function eyeLog(msg: string): void {
+  try { appendFileSync(require('path').join(__dirname, '..', '..', '.temp', 'hotkey.log'), '[eye] ' + msg + '\n'); } catch { /* 忽略 */ }
+}
 
 /**
  * 视觉定位器：Qwen3-VL-8B（DashScope API，OpenAI 兼容）。
@@ -46,10 +52,38 @@ export class VlmLocator {
 
   /**
    * 在截图中定位目标。
+   * 优先本地眼睛（OmniParser 检测 + OCR 标签，离线快检）；未命中回落 Qwen3-VL。
    * @param target 目标描述（如 "微信发送按钮"、"Issues 标签"）
    * @returns 屏幕 DIP 矩形；未找到 / 调用失败返回 null
    */
   async locate(target: string, shot: ScreenShot): Promise<LocateResult | null> {
+    // ① 本地预检（CURSORMIND_LOCAL_EYE=1 生效）：命中直接回，200-500ms 零 API 成本
+    if (localEyeEnabled()) {
+      try {
+        const t0 = Date.now();
+        const els = await listElements(shot);
+        const hit = matchElement(target, els);
+        if (hit) {
+          eyeLog('本地命中 "' + target + '" → ' + (hit.label || '(无标签)') + ' 共' + els.length + '元素 ' + (Date.now() - t0) + 'ms');
+          const x1 = (hit.x1 / 1000) * shot.screenWidth;
+          const y1 = (hit.y1 / 1000) * shot.screenHeight;
+          const x2 = (hit.x2 / 1000) * shot.screenWidth;
+          const y2 = (hit.y2 / 1000) * shot.screenHeight;
+          return {
+            rect: {
+              x: Math.round(x1),
+              y: Math.round(y1),
+              width: Math.max(8, Math.round(x2 - x1)),
+              height: Math.max(8, Math.round(y2 - y1)),
+            },
+            label: hit.label || null,
+          };
+        }
+        eyeLog('本地未命中 "' + target + '"，回落Qwen3-VL（元素' + els.length + '个）');
+      } catch (e) { eyeLog('本地异常回落: ' + (e instanceof Error ? e.message : String(e))); }
+    }
+
+    // ② Qwen3-VL 云端定位（原有逻辑）
     if (!this.apiKey) return null;
     try {
       const resp = await fetch(`${this.baseUrl}/chat/completions`, {

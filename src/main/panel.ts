@@ -2,13 +2,15 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { isVoiceOn } from './tts';
 import { isAutoReplace } from './textops';
+import { isOrbVisible } from './overlay';
+import { captureScreen } from './screenshot';
 
 let panel: BrowserWindow | null = null;
 /** 退场中标志：cancel 后到达的迟到回复不再拉回窗口（白条 bug 根治） */
 let dismissed = false;
 
 const PANEL_W = 620;
-const PANEL_H = 430;
+const PANEL_H = 760; // 大窗口：设置面板内容多（含 MCP 区），需要足够高才能完整展开不滚动
 
 /**
  * 提问/设置面板：大透明窗口，平时隐藏（dock 已删，「不用时窗口不存在」），
@@ -76,6 +78,8 @@ export function createPanel(): BrowserWindow {
   return panel;
 }
 
+import { loadHotwords } from './hotwords';
+
 function sendMeta(): void {
   if (!panel || panel.isDestroyed()) return;
   panel.webContents.send('panel:meta', JSON.stringify({
@@ -83,6 +87,8 @@ function sendMeta(): void {
     eye: !!process.env.QWEN_API_KEY,
     voice: isVoiceOn(),            // 开关真实状态同步（修复：重开后显示旧默认值）
     autoReplace: isAutoReplace(),
+    orbVisible: isOrbVisible(),    // 球可见性同步（设置面板「灵标球」开关）
+    hotwords: loadHotwords().join(', '), // 语音热词回显
   }));
 }
 
@@ -98,7 +104,9 @@ export function showPanel(): void {
   cancelPendingHide();
   if (!panel) createPanel();
   if (!panel || panel.isDestroyed()) return;
+  movePanelNearCursor(); // 提问面板从鼠标右下角展开
   if (!panel.isVisible()) panel.show();
+  pushBackdrop(); // 桌面截屏推给渲染层做液态玻璃背景实层
   panel.webContents.send('panel:open');
   sendMeta();
 }
@@ -109,7 +117,9 @@ export function openSearchPanel(): void {
   cancelPendingHide();
   if (!panel) createPanel();
   if (!panel || panel.isDestroyed()) return;
+  movePanelNearCursor(); // 打字区从鼠标右下角展开（不固定屏幕中间）
   if (!panel.isVisible()) panel.show();
+  pushBackdrop();
   panel.webContents.send('panel:search');
   sendMeta();
 }
@@ -120,9 +130,48 @@ export function openSettingsPanel(): void {
   cancelPendingHide();
   if (!panel) createPanel();
   if (!panel || panel.isDestroyed()) return;
+  movePanelDefault(); // 设置面板回屏幕中央（全局操作，不跟鼠标）
   if (!panel.isVisible()) panel.show();
+  pushBackdrop();
   panel.webContents.send('panel:settings');
   sendMeta();
+}
+
+/** 提问/打字面板跟随鼠标：把窗口的「底部中央」（morph 起点）对准鼠标右下角偏移处，
+ *  面板即从鼠标右下角长出；clamp 在工作区内避免出屏。 */
+function movePanelNearCursor(): void {
+  if (!panel || panel.isDestroyed()) return;
+  try {
+    const cursor = screen.getCursorScreenPoint();
+    const [winW, winH] = panel.getSize();
+    const OFF = 28; // 右下偏移：morph 小圆点出现在鼠标右下 28px 处（Gemini 式贴近）
+    let x = Math.round(cursor.x + OFF - winW / 2);
+    let y = Math.round(cursor.y + OFF - winH);
+    const wa = screen.getPrimaryDisplay().workArea;
+    x = Math.max(wa.x, Math.min(x, wa.x + wa.width - winW));
+    y = Math.max(wa.y, Math.min(y, wa.y + wa.height - winH));
+    panel.setPosition(x, y);
+  } catch { /* 定位失败不阻塞面板展开 */ }
+}
+
+/** 面板回默认位置（屏幕底部居中，与创建时一致） */
+function movePanelDefault(): void {
+  if (!panel || panel.isDestroyed()) return;
+  try {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    const x = Math.round((width - PANEL_W) / 2);
+    const y = Math.max(0, height - 130 - PANEL_H);
+    panel.setPosition(x, y);
+  } catch { /* 忽略 */ }
+}
+
+/** 推送桌面截屏（面板玻璃背景实层；静默失败不阻塞面板展开） */
+function pushBackdrop(): void {
+  void captureScreen().then((shot) => {
+    if (shot && panel && !panel.isDestroyed() && !panel.webContents.isDestroyed()) {
+      panel.webContents.send('panel:backdrop', shot.dataUrl);
+    }
+  });
 }
 
 /** morph 收起并隐藏窗口（提交问题后调用：视线回到球，面板整体退场） */
@@ -150,7 +199,10 @@ export function hidePanel(): void {
 export function showReply(text: string): void {
   if (!panel || panel.isDestroyed() || dismissed) return;
   cancelPendingHide(); // 回复在 collapse 的 420ms 隐藏窗口内到达：取消隐藏，否则刚展开就被藏
-  if (!panel.isVisible()) panel.show();
+  if (!panel.isVisible()) {
+    panel.show();
+    pushBackdrop();
+  }
   panel.webContents.send('panel:reply', text);
 }
 

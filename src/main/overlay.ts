@@ -13,11 +13,20 @@ export function createOverlay(): BrowserWindow {
   const display = screen.getPrimaryDisplay();
   const { width, height, x, y } = display.bounds;
 
+  // 顶部白条修复（真因：Win11 给透明无边框窗口绘制的 DWM 装饰带——半透明白、横贯全屏、
+  // 左上角带窗口标题文字"cursorMind overlay"，非页面内容）：
+  //   roundedCorners: false  → 关掉 Win11 DWM 装饰（含那条带标题的 caption band），根治
+  //   backgroundColor 透明   → 兜底：不给 DWM 留默认白底
+  //   顶部 1px 内缩          → 上一轮的边缘线保险，无害保留
+  const TOP_TRIM = 1;
+  const trimY = y + TOP_TRIM;
+  const trimH = Math.max(1, height - TOP_TRIM);
+
   win = new BrowserWindow({
     width,
-    height,
+    height: trimH,
     x,
-    y,
+    y: trimY,
     transparent: true,
     frame: false,
     resizable: false,
@@ -27,6 +36,10 @@ export function createOverlay(): BrowserWindow {
     hasShadow: false,
     fullscreenable: false,
     focusable: false,
+    roundedCorners: false,        // Win11：关 DWM 装饰带（顶部白条+标题文字的来源）
+    thickFrame: false,            // 去 WS_THICKFRAME：标题栏样式根源；点击触发 DWM 重绘后会把
+                                  //   caption 标题栏画出来（"点一下鼠标白条出现"的真因），去掉即无 caption 可绘
+    backgroundColor: '#00000000', // 显式透明底色，兜底默认白底残留
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -80,6 +93,16 @@ export function setClickThrough(through: boolean): void {
   if (win && !win.isDestroyed()) {
     win.setIgnoreMouseEvents(through, { forward: true });
   }
+}
+
+/** 球可见性（设置面板「灵标球」开关）：隐藏时球 DOM display:none，语音/指路/优化链路全保留 */
+let orbVisible = true;
+export function setOrbVisible(v: boolean): void {
+  orbVisible = !!v;
+  sendCommand({ type: 'setOrbVisible', visible: orbVisible });
+}
+export function isOrbVisible(): boolean {
+  return orbVisible;
 }
 
 /** 向渲染进程下发精灵指令 */

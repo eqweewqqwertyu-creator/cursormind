@@ -8,6 +8,8 @@
  *   文档写的 output.output.sentence.text 结构不对。
  */
 
+import { correctHotwords } from './hotwords';
+
 const ASR_URL = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 const ASR_MODEL = process.env.QWEN_ASR_MODEL || 'qwen3-asr-flash';
 
@@ -21,7 +23,8 @@ interface AsrResponse {
   };
 }
 
-/** 成功返回 [识别文本, null]，失败返回 [null, 失败原因]（由调用方写日志） */
+/** 成功返回 [识别文本, null]，失败返回 [null, 失败原因]（由调用方写日志）。
+ *  识别成功后过一次热词近似校正（对标 heyClicky 的 dictation_custom_words）。 */
 export async function transcribe(audioDataUrl: string): Promise<[string | null, string | null]> {
   const key = process.env.QWEN_API_KEY;
   if (!key) return [null, '无 QWEN_API_KEY'];
@@ -59,7 +62,7 @@ export async function transcribe(audioDataUrl: string): Promise<[string | null, 
         : raw || ''
     ).trim();
     if (!text) return [null, '接口 200 但无文本（可能没录到声音）'];
-    return [text, null];
+    return [correctHotwords(text), null];
   } catch (e) {
     return [null, '异常: ' + (e instanceof Error ? e.message : String(e))];
   }

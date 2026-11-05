@@ -35,9 +35,9 @@
   const wctx = wave.getContext('2d');
 
   // ---- 常量 ----
-  const ORB_R = 22;                 // 球半径（直径 44px）
-  const CAPSULE_W = 160, CAPSULE_H = 44; // 胶囊槽（随球变小）
-  const FOLLOW_DX = 34, FOLLOW_DY = 34;  // 跟随偏移：鼠标右下角（再偏一些避让光标）
+  const ORB_R = 7;                  // 球半径（直径 14px，缩小版：随行不抢镜）
+  const CAPSULE_W = 160, CAPSULE_H = 44; // 语音胶囊不变小（可读性优先：声波+文字是功能件）
+  const FOLLOW_DX = 18, FOLLOW_DY = 18;  // 跟随偏移随球同缩（球小了贴太近会盖住光标热点）
   const SPRING_K = 140;             // 弹簧刚度（跟手度）
   const SPRING_C = 18;              // 阻尼（惯性/回弹）
   // 纯白玻璃体系（与球/面板同源）：墨灰主文字 + 灰蓝交互色；橙仅留给改写动作（DOM 层）
@@ -66,7 +66,19 @@
   let audioCtx = null, analyser = null, micStream = null;
   let volSmooth = 0;
 
-  const api = window.cursormind;
+  // ---- 鼠标画圈（lasso）状态：用户笔迹层，与精灵白色指路圈区分 ----
+  let lassoPts = null;        // 轨迹点（DIP）
+  let lassoRect = null;       // 包围盒
+  let lassoBubble = '';
+  let lassoStart = 0;         // 激活时刻（气泡显示窗口用）
+  let lassoAlpha = 0;
+  let lassoDying = false;     // 渐隐中（收到 lassoClear）
+
+  // ---- 球可见性（设置面板开关；隐藏 = 球 DOM display:none，指令/指路层/语音链路全保留） ----
+  let orbVisible = true;
+  function applyOrbVisible() {
+    orb.style.display = orbVisible ? '' : 'none';
+  }
 
   // ================= 尺寸 =================
   function resize() {
@@ -82,6 +94,8 @@
   }
   resize();
   window.addEventListener('resize', resize);
+
+  const api = window.cursormind;
 
   // ================= 指令 =================
   if (api) {
@@ -99,13 +113,22 @@
         case 'idle': setIdle(); break;
         case 'toggleVoice': toggleVoice(); break;
         case 'dblNext': abortListening(); break; // 双击 ~ 的第二击：取消录音态，下一步由主进程 nextStep 推进
+        case 'setOrbVisible': setOrbVisible(cmd.visible); break;
         case 'asrResult': onAsrResult(cmd.text); break;
+        case 'lasso': startLasso(cmd.points, cmd.rect, cmd.bubble); break;
+        case 'lassoClear': fadeOutLasso(); break;
         case 'envFrame': break; // 球迁 DOM 后折射已由 CSS 处理，环境帧弃用
       }
     });
     api.onCursor(function (p) {
       if (p && typeof p.x === 'number') mouse = { x: p.x, y: p.y };
     });
+  }
+
+  // 球可见性指令（设置面板开关）：隐藏时球消失，语音/指路/优化链路不受影响
+  function setOrbVisible(v) {
+    orbVisible = !!v;
+    applyOrbVisible();
   }
 
   // ================= 形状切换 =================
@@ -231,6 +254,53 @@
     guideState = 'idle';
     targetRect = null;
     bubbleText = '';
+  }
+
+  // ================= 鼠标画圈（lasso）：橙色用户笔迹 + 渐隐 =================
+  // 橙 #F97316 = 用户主动发起的动作色（与 textcard 替换按钮同源）；
+  // 精灵自己的指路圈是白色——「用户圈」和「精灵圈」一眼可分。
+  function startLasso(points, rect, bubble) {
+    if (!points || points.length < 2) return;
+    lassoPts = points;
+    lassoRect = rect || null;
+    lassoBubble = bubble || '';
+    lassoStart = performance.now();
+    lassoAlpha = 1;
+    lassoDying = false;
+  }
+
+  function fadeOutLasso() {
+    if (lassoPts) lassoDying = true; // draw 循环里逐帧衰减至消失
+  }
+
+  function drawLasso() {
+    if (!lassoPts || lassoPts.length < 2) return;
+    if (lassoDying) {
+      lassoAlpha -= 0.06; // 60fps 下约 0.3s 消失
+      if (lassoAlpha <= 0) {
+        lassoPts = null; lassoRect = null; lassoBubble = '';
+        lassoDying = false; lassoAlpha = 0;
+        return;
+      }
+    }
+    const a = lassoAlpha;
+    sctx.save();
+    sctx.beginPath();
+    sctx.moveTo(lassoPts[0].x, lassoPts[0].y);
+    for (let i = 1; i < lassoPts.length; i++) sctx.lineTo(lassoPts[i].x, lassoPts[i].y);
+    sctx.closePath();
+    // 极淡暖色填充：提示“圈住的区域”，不遮挡内容
+    sctx.fillStyle = 'rgba(249,115,22,' + (0.05 * a).toFixed(3) + ')';
+    sctx.fill();
+    // 笔迹：橙描边 + 自发光
+    sctx.lineWidth = 3;
+    sctx.lineJoin = 'round';
+    sctx.lineCap = 'round';
+    sctx.strokeStyle = 'rgba(249,115,22,' + (0.85 * a).toFixed(3) + ')';
+    sctx.shadowColor = 'rgba(249,115,22,0.35)';
+    sctx.shadowBlur = 6;
+    sctx.stroke();
+    sctx.restore();
   }
 
   // ================= 语音胶囊态（MediaRecorder 录音 → 主进程百炼 ASR） =================
@@ -470,14 +540,20 @@
 
   function draw() {
     sctx.clearRect(0, 0, stage.width, stage.height);
-    if (mode === 'guide' && guideState === 'pointing' && targetRect) {
-      drawHighlight(targetRect);
-    }
+    // 指路反馈：不再画跟随鼠标的高亮框（已按用户要求删除，指路靠精灵球飞行定位）；
+    // 文字气泡贴鼠标右下角（不挡鼠标本体，不钉屏幕顶部）
     if (bubbleText && mode === 'guide' && (guideState === 'pointing' || guideState === 'idle')) {
-      drawBubble(targetRect, bubbleText);
+      drawBubble(null, bubbleText);
     }
     if (thinking && mode !== 'follow') {
       drawThinkBubble();
+    }
+    // 用户画圈层：最上层（用户输入优先于精灵反馈）；激活 8 秒内带气泡提示
+    if (lassoPts) {
+      drawLasso();
+      if (!lassoDying && lassoBubble && performance.now() - lassoStart < 8000) {
+        drawBubble(lassoRect, lassoBubble);
+      }
     }
   }
 
@@ -513,15 +589,17 @@
     const bh = fontSize + padY * 2;
     let bx, by;
     if (rect) {
+      // 有锚点矩形（圈选等）：贴矩形上方
       bx = rect.x + rect.width / 2 - bw / 2;
       const above = rect.y - bh - 12;
       by = above > 8 ? above : rect.y + rect.height + 12;
     } else {
-      bx = px - bw / 2;
-      by = py - bh - 40;
+      // 无锚点（指路文字）：贴鼠标右下角，不挡鼠标本体
+      bx = mouse.x + 24;
+      by = mouse.y + 18;
     }
     bx = Math.max(8, Math.min(stage.width - bw - 8, bx));
-    by = Math.max(8, by);
+    by = Math.max(8, Math.min(stage.height - bh - 8, by));
     sctx.save();
     // 玻璃气泡：半透白体 + 灰蓝细边 + 球同款蓝调柔光（无 backdrop-filter，用透明度模拟材质）
     sctx.shadowColor = 'rgba(40, 60, 100, 0.16)';

@@ -16,6 +16,8 @@ export interface TrayCallbacks {
   onNewChat: () => void;
   onDemo: () => void;
   onSettings: () => void;
+  onBoard: () => void;
+  onBgTasks: () => void;
   onQuit: () => void;
 }
 
@@ -72,6 +74,14 @@ export function setTrayBusy(on: boolean, label?: string): void {
   applyState();
 }
 
+/** 忙态中更新 tooltip 文案（不改变忙态计数；非忙态时静默忽略）。
+ *  对标 heyClicky 的 activity strip：agent 执行时显示当前步骤数。 */
+export function setTrayLabel(label: string): void {
+  if (!tray || busyCount === 0) return;
+  busyLabel = label;
+  applyState();
+}
+
 export function initTray(cb: TrayCallbacks): void {
   if (tray) return;
   idleImg = makeImage('idle');
@@ -86,6 +96,8 @@ export function initTray(cb: TrayCallbacks): void {
       Menu.buildFromTemplate([
         { label: '召唤灵标', click: () => cb.onSummon() },
         { label: '新对话', click: () => cb.onNewChat() },
+        { label: '看板', click: () => cb.onBoard() },
+        { label: '后台任务', click: () => cb.onBgTasks() },
         { label: '自检演示', click: () => cb.onDemo() },
         { label: '设置…', click: () => cb.onSettings() },
         { type: 'separator' },

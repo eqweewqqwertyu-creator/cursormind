@@ -6,6 +6,13 @@ import { captureScreen } from './screenshot';
 import { setTrayBusy } from './tray';
 import { parsePointing } from './point-protocol';
 import type { VlmLocator } from './vlm-locator';
+import { appendFileSync } from 'fs';
+import * as path from 'path';
+
+const logFile = path.join(__dirname, '..', '..', '.temp', 'hotkey.log');
+function agentLog(msg: string): void {
+  try { appendFileSync(logFile, '[agent] ' + msg + '\n'); } catch { /* 忽略 */ }
+}
 
 /** 长回答：显示在提问面板上方的回复条（不截断）；气泡只放一句短摘要；语音朗读全文 */
 function finalAnswer(text: string): void {
@@ -46,23 +53,23 @@ interface ChatResponse {
   choices?: Array<{ message?: ChatMessage }>;
 }
 
-const SYSTEM_PROMPT = `你是"灵标"，一个教学型鼠标精灵助手。你收到一张当前屏幕的截图（带尺寸标注），帮用户找到某个功能并指给他看。
+const SYSTEM_PROMPT = `你是"灵标"，一个教学型鼠标精灵助手。你有一双眼睛：每轮都会收到当前屏幕的截图（带尺寸标注），你能直接看图理解界面并给出坐标。
 
 工作流程（重要）：
-1. 看截图理解用户当前在哪个应用/界面、处于什么状态。
-2. 用户想找屏幕上的某个功能/按钮/面板时：先调用 locate(target) 让专职视觉模型精确定位，再根据返回结果组织回答。
-3. locate 返回成功：精灵会自己飞过去圈住目标，你的回答只需补充"怎么用"的操作要点。
-4. locate 返回 null（没找到）：如实用文字描述位置（"在屏幕左上角导航栏"等），若需要粗略指路，可在回复最末尾追加坐标标签 [POINT:x,y:标签]（坐标系 = 截图标签注明的像素尺寸，原点左上，x向右y向下）。
-5. 闲聊或知识类问题：直接用 answer 回答，不指路，若用户提到了屏幕元素才需要 locate。
+1. 先认真看你收到的截图，理解用户当前在哪个应用/界面、处于什么状态。
+2. 用户想找屏幕上的某个功能/按钮/面板时：【必须先调用 locate(target)】让专职视觉模型给出精确边界框，精灵会飞过去圈住它。你负责判断"找什么、怎么讲"，坐标一律交给 locate——不要自己估坐标（你的坐标估计不稳定）。
+3. locate 返回成功：你的回答只需补充"这是什么、下一步怎么操作"，不要再给坐标标签。
+4. locate 返回 NOT_FOUND：如实用文字描述位置（"在屏幕左上角导航栏"等），若需要粗略指路，可在回复最末尾追加坐标标签 [POINT:x,y:标签]（坐标系 = 截图标签注明的像素尺寸）。
+5. 闲聊或知识类问题：直接用 answer 回答，不指路。
 6. 你只指路和讲解，绝不替用户点击或输入。教学为先：告诉用户"是什么、在哪、下一步点什么"。
 
 连续引导（多步任务，重要）：
 - 用户的请求往往需要多步操作才能完成（如"找到微信的设置界面"需要：双击图标 → 打开微信 → 点左下角设置）。
 - 每次只指【当前这一步】。指完后在回复末尾明确告诉用户："完成后按 Ctrl+Alt+N 继续"。
-- 【必须先指后说】每一步的具体目标（按钮/图标/菜单项）都要先调用 locate(target) 让精灵飞过去圈住，再用文字补充说明。不要只给文字描述——用户需要看到框才知道点哪。只有纯知识性回答才允许不带 locate。
+- 每一步都要给出位置：先调 locate(target) 拿精确框。不要只给文字描述——用户需要看到框才知道点哪。
 - 用户按 Ctrl+Alt+N 后，系统会重新截图并附上"[用户已完成上一步]"发给你。你要：
-  a) 看截图确认上一步是否真的完成（用户可能点错了，如没完成就再指一遍纠正）；
-  b) 完成了就继续指下一步（同样先 locate 再说话）；
+  a) 看最新截图确认上一步是否真的完成（用户可能点错了，如没完成就再指一遍纠正）；
+  b) 完成了就继续指下一步；
   c) 看到目标已达成（如设置界面已打开），明确说"任务完成"，不再要求按 N。
 - 每一步都基于【当前截图的真实状态】判断，不要死板依赖预设步骤：用户抄近路了就顺着来，点错了就纠正。
 
@@ -134,15 +141,15 @@ export class Agent {
     const cancelled = (): boolean => gen !== this.generation;
 
     this.history.push({ role: 'user', content: question });
-    if (this.history.length > 20) {
-      this.history = this.history.slice(-20);
-    }
+    this.trimHistory();
 
     // 思考中反馈：提交即触发，让用户知道正在处理
     sendCommand({ type: 'thinking', text: '思考中' });
 
     // 自动截图：让模型看到真实屏幕；尺寸写进文本，作为坐标系自描述
+    const tShot = Date.now();
     const shot = await captureScreen();
+    agentLog('截图 ' + (Date.now() - tShot) + 'ms size=' + (shot ? shot.width + 'x' + shot.height : 'null'));
     if (cancelled()) return; // 检查点：截图之后
     this.currentShot = shot;
     if (shot) {
@@ -159,19 +166,27 @@ export class Agent {
     }
 
     for (let step = 0; step < 8; step++) {
+      const tChat = Date.now();
       const resp = await this.chat();
+      const chatMs = Date.now() - tChat;
       if (cancelled()) return; // 检查点：API 响应之后
-      if (!resp) return;
+      if (!resp) { agentLog('模型调用失败 step=' + step); return; }
       const msg = resp.choices?.[0]?.message;
       if (!msg) return;
+      agentLog('模型 ' + this.model + ' step=' + step + ' ' + chatMs + 'ms tools=' + (msg.tool_calls ? msg.tool_calls.length : 0));
 
       let contentStr = '';
       if (typeof msg.content === 'string') contentStr = msg.content;
 
       const toolCalls = msg.tool_calls || [];
       if (toolCalls.length > 0) {
-        // 历史防污染：入历史的文本剥离 POINT 标签
-        this.history.push({ ...msg, content: stripPointTag(contentStr) });
+        // 历史防污染：入历史的文本剥离 POINT 标签；只保留必要字段（剥 reasoning_content 等，
+        // API 返回的附加字段回传可能导致 400）
+        this.history.push({
+          role: 'assistant',
+          content: contentStr ? stripPointTag(contentStr) : null,
+          tool_calls: toolCalls,
+        });
         for (const tc of toolCalls) {
           // 视觉定位阶段提示更新
           if (tc.function.name === 'locate') {
@@ -196,6 +211,7 @@ export class Agent {
 
   /** 最终回答处理：locate 已指路则只补充话术；否则解析 POINT 粗指路兜底 */
   private applyFinal(text: string): void {
+    agentLog('最终回答: ' + text.replace(/\s+/g, ' ').slice(0, 60));
     const parsed = parsePointing(text);
 
     // POINT 粗指路（locate 失败时的兜底路径）
@@ -221,6 +237,29 @@ export class Agent {
     }
   }
 
+  /** 历史裁剪：多轮教学后 history 超限。切点必须落在「轮次边界」（user 消息开头），
+   *  否则会切出孤立的 tool 消息（assistant(tool_calls) 被切掉、tool 悬空）——
+   *  DeepSeek 对消息序列严格校验，直接 400。这就是「教学七八步后调用失败(400)」的根因。 */
+  private trimHistory(): void {
+    const MAX = 20;
+    if (this.history.length <= MAX) return;
+    let start = this.history.length - MAX;
+    while (start < this.history.length && this.history[start].role !== 'user') start++;
+    this.history = this.history.slice(start);
+    // 请求体瘦身：只保留最近 2 张截图，更早的图片消息降级为纯文本（防请求体膨胀）
+    let imgBudget = 2;
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      const m = this.history[i];
+      if (m.role !== 'user' || !Array.isArray(m.content)) continue;
+      const parts = m.content as ContentPart[];
+      if (!parts.some((p) => p.type === 'image_url')) continue;
+      if (imgBudget > 0) { imgBudget--; continue; }
+      const text = parts.filter((p) => p.type === 'text').map((p) => p.text).join('\n');
+      this.history[i] = { role: 'user', content: text || '（此前的屏幕截图已省略）' };
+    }
+    agentLog('历史裁剪 → ' + this.history.length + ' 条（切点=user 边界，旧截图已瘦身）');
+  }
+
   private async chat(): Promise<ChatResponse | null> {
     try {
       const resp = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -238,6 +277,8 @@ export class Agent {
         }),
       });
       if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        agentLog('HTTP ' + resp.status + ': ' + truncate(body, 300));
         sendCommand({ type: 'bubble', text: '模型调用失败（' + resp.status + '）' });
         return null;
       }
@@ -312,7 +353,7 @@ function buildTools(): ToolDef[] {
       function: {
         name: 'locate',
         description:
-          '调用专职视觉模型在当前截图中精确定位一个 UI 元素（按钮/菜单/面板/输入框等），精灵会飞过去圈住它。用户想找屏幕上的任何东西时先调用这个工具。',
+          '可选增强：调用专职视觉模型在当前截图中给出精确边界框（适合小图标、密集控件、你没把握的位置）。目标在截图中清晰可见时不必调用，直接给 [POINT:x,y:标签] 更快。',
         parameters: {
           type: 'object',
           properties: {
